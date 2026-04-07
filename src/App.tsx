@@ -16,8 +16,10 @@ import { AccessControl } from './components/AccessControl';
 import { Emergency } from './components/Emergency';
 import { Reports } from './components/Reports';
 import { Blockchain } from './components/Blockchain';
-import { Activity, Droplets, Thermometer, Plus } from 'lucide-react';
+import { AuthPage } from './components/AuthPage';
+import { Activity, Droplets, Thermometer, Plus, LogOut } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useEffect } from 'react';
 
 const heartRateData = [
   { value: 60 }, { value: 55 }, { value: 65 }, { value: 70 }, 
@@ -36,6 +38,44 @@ const tempData = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isDemo, setIsDemo] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+          if (data.isDemo) setIsDemo(true);
+        }
+      } catch (err) {
+        console.error('Auth check failed');
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setUser(null);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage onLogin={setUser} />;
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -113,10 +153,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
       
       <main className="ml-64 flex-1 min-h-screen flex flex-col">
-        <TopBar />
+        {isDemo && (
+          <div className="bg-amber-50 border-b border-amber-200 px-8 py-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">
+              Demo Mode: MongoDB not connected. Using in-memory storage.
+            </p>
+            <p className="text-[10px] font-medium text-amber-600">
+              Configure MONGODB_URI in Settings for persistence.
+            </p>
+          </div>
+        )}
+        <TopBar user={user} />
         
         {renderContent()}
 

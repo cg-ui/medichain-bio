@@ -9,7 +9,8 @@ import {
   Upload, 
   Settings, 
   HelpCircle,
-  Shield
+  Shield,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { motion } from 'motion/react';
@@ -27,9 +28,10 @@ const navItems = [
 interface SidebarProps {
   activeTab: string;
   onTabChange: (id: string) => void;
+  onLogout?: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-surface border-r-0 flex flex-col p-4 gap-2 z-50">
       <div className="flex items-center gap-3 px-3 py-6 mb-4">
@@ -78,6 +80,15 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           <HelpCircle className="w-5 h-5" />
           <span className="text-sm font-medium">Support</span>
         </a>
+        {onLogout && (
+          <button 
+            onClick={onLogout}
+            className="flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-all w-full text-left"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+        )}
       </div>
     </aside>
   );

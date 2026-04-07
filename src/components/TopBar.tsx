@@ -2,7 +2,11 @@ import React from 'react';
 import { Search, Bell, Moon, Share2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export function TopBar() {
+interface TopBarProps {
+  user?: any;
+}
+
+export function TopBar({ user }: TopBarProps) {
   return (
     <header className="flex justify-between items-center w-full px-8 py-4 sticky top-0 bg-background/80 backdrop-blur-xl z-40 font-headline tracking-tight shadow-[0_20px_40px_rgba(25,28,30,0.06)]">
       <div className="flex items-center gap-6 flex-1">
@@ -36,13 +40,19 @@ export function TopBar() {
           <Moon className="w-5 h-5 text-on-surface-variant" />
         </button>
         
-        <div className="ml-2 w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-white shadow-sm cursor-pointer hover:scale-105 transition-transform">
-          <img 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsz1-3_kjfxt7G__f058FWUHOM6W9EWPS2jyWWmEFpv9LCzyRT3NdDng7MxesH9stgmHS1f5AkaN81kxfpA3eVP5QW01nPwRpfva4nYQKudUdGQk8vANXJ2Us63mfZXeu6FRKBDhL7r7MPMQuf7LDwRZfd_4YPrZYzuEs8j03irxWpwteBeU3q_7L5nFGe8CZ6pAM3IcmaTYcnuXtAHHXrtcfSkyp1Z3kHt1iXchVvmPn35kgkUYSh7zvEkNlekrslnX86br0h6ycr" 
-            alt="User profile"
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
+        <div className="flex items-center gap-3 ml-2">
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-bold text-on-surface leading-none mb-1">{user?.email?.split('@')[0] || 'User'}</p>
+            <p className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none">{user?.role || 'Guest'}</p>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-white shadow-sm cursor-pointer hover:scale-105 transition-transform">
+            <img 
+              src={`https://picsum.photos/seed/${user?.email || 'default'}/100/100`} 
+              alt="User profile"
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </div>
         </div>
       </div>
     </header>
