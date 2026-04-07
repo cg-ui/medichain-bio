@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Shield, User, Stethoscope, Mail, Lock, Eye, EyeOff, ArrowRight, Chrome, Apple, Moon, Sun } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, User, Stethoscope, Mail, Lock, Eye, EyeOff, ArrowRight, Chrome, Apple, Moon, Sun, Wallet, AlertCircle, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { useMetaMask } from '../hooks/useMetaMask';
 
 interface AuthPageProps {
   onLogin: (user: any) => void;
@@ -10,43 +11,25 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProps) {
-  const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState<'patient' | 'doctor'>('patient');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isDemo, setIsDemo] = useState(false);
+  const { walletAddress, isConnecting, error: metamaskError, connect } = useMetaMask();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/signup';
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role }),
+  useEffect(() => {
+    if (walletAddress) {
+      onLogin({
+        email: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+        walletAddress,
+        role,
+        name: role === 'doctor' ? 'Dr. Web3' : 'Sovereign Patient'
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Auth failed');
-      
-      if (isLogin) {
-        if (data.isDemo) setIsDemo(true);
-        onLogin(data.user);
-      } else {
-        setIsLogin(true);
-        setError('Account created! Please sign in.');
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
     }
+  }, [walletAddress, onLogin, role]);
+
+  const handleConnect = async () => {
+    await connect();
   };
+
+  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row p-8 gap-8">
@@ -109,102 +92,73 @@ export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProp
       {/* Right Side: Auth Form */}
       <div className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-md bg-surface-container-lowest p-10 rounded-[3rem] shadow-2xl border border-outline-variant/10">
-          <div className="flex bg-surface-container-low p-1 rounded-full mb-8">
-            <button 
-              onClick={() => setIsLogin(true)}
-              className={cn("flex-1 py-3 rounded-full text-sm font-bold transition-all", isLogin ? "bg-surface-container-lowest shadow-sm text-primary" : "text-outline")}
-            >
-              Sign In
-            </button>
-            <button 
-              onClick={() => setIsLogin(false)}
-              className={cn("flex-1 py-3 rounded-full text-sm font-bold transition-all", !isLogin ? "bg-surface-container-lowest shadow-sm text-primary" : "text-outline")}
-            >
-              Create Account
-            </button>
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-4">
+              <Wallet className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-headline font-bold text-on-surface">Web3 Authentication</h3>
+            <p className="text-sm text-outline mt-2">Connect your MetaMask wallet to access the secure healthcare network.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline mb-2 block">Work Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-outline w-5 h-5" />
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="dr.smith@hospital.com"
-                  className="w-full bg-surface-container-low border-none rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-primary/20 text-sm outline-none"
-                  required
-                />
+          <div className="space-y-6">
+            {metamaskError && (
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-start gap-3 text-red-600 dark:text-red-400">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <p className="text-xs font-bold leading-relaxed">{metamaskError}</p>
               </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between mb-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Password</label>
-                <button type="button" className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline">Forgot?</button>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-outline w-5 h-5" />
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full bg-surface-container-low border-none rounded-2xl py-4 pl-12 pr-12 focus:ring-2 focus:ring-primary/20 text-sm outline-none"
-                  required
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {error && <p className="text-xs font-bold text-red-500 text-center">{error}</p>}
-
-            <div className="flex items-center gap-3">
-              <input type="checkbox" id="remember" className="w-4 h-4 rounded border-outline-variant/30 text-primary focus:ring-primary/20" />
-              <label htmlFor="remember" className="text-xs font-medium text-on-surface-variant">Keep me logged in on this clinical workstation</label>
-            </div>
+            )}
 
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              disabled={loading}
-              className="w-full py-4 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-3 shadow-xl shadow-primary/20 disabled:opacity-50"
+              onClick={handleConnect}
+              disabled={isConnecting}
+              className="w-full py-5 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-3 shadow-xl shadow-primary/20 disabled:opacity-50"
             >
-              {loading ? "Processing..." : isLogin ? "Secure Sign In" : "Create Secure Account"}
-              <ArrowRight className="w-5 h-5" />
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Connecting...
+                </>
+              ) : walletAddress ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  {formatAddress(walletAddress)}
+                </>
+              ) : (
+                <>
+                  <Wallet className="w-5 h-5" />
+                  Secure Sign In via MetaMask
+                </>
+              )}
             </motion.button>
-          </form>
 
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-outline-variant/20"></div>
-            </div>
-            <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-widest text-outline">
-              <span className="bg-surface-container-lowest px-4">Or continue with</span>
-            </div>
+            {!window.ethereum && (
+              <div className="p-6 rounded-3xl bg-surface-container-low border border-outline-variant/10 text-center">
+                <p className="text-xs font-medium text-outline mb-4">MetaMask is not detected in your browser.</p>
+                <a 
+                  href="https://metamask.io/download/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-widest hover:underline"
+                >
+                  Install MetaMask <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-3 py-3 rounded-2xl border border-outline-variant/20 hover:bg-surface-container-low transition-all">
-              <Chrome className="w-5 h-5" />
-              <span className="text-sm font-bold">Google</span>
-            </button>
-            <button className="flex items-center justify-center gap-3 py-3 rounded-2xl border border-outline-variant/20 hover:bg-surface-container-low transition-all">
-              <Apple className="w-5 h-5" />
-              <span className="text-sm font-bold">Apple</span>
-            </button>
+          <div className="mt-12 space-y-4">
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-surface-container-low/50 border border-outline-variant/5">
+              <Shield className="w-5 h-5 text-teal-500" />
+              <p className="text-[10px] font-medium text-outline leading-tight">
+                Your private keys never leave your device. All clinical data is encrypted using your wallet's unique signature.
+              </p>
+            </div>
           </div>
 
           <p className="mt-8 text-[10px] text-center text-outline leading-relaxed">
-            By signing in, you agree to our <button className="text-primary font-bold hover:underline">Privacy Architecture</button> and <button className="text-primary font-bold hover:underline">Sovereignty Protocols</button>.
+            By connecting, you authorize MediChain to verify your identity through the <button className="text-primary font-bold hover:underline">Ethereum Blockchain</button> and adhere to our <button className="text-primary font-bold hover:underline">Sovereignty Protocols</button>.
           </p>
         </div>
       </div>

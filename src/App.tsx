@@ -72,8 +72,14 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    // For Web3, we just clear the local state
     setUser(null);
+    // If there was a session, we can still try to clear it
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      // Ignore errors if backend auth is not used
+    }
   };
 
   if (authLoading) {
