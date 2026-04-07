@@ -1,12 +1,15 @@
 import React from 'react';
-import { Search, Bell, Moon, Share2 } from 'lucide-react';
+import { Search, Bell, Moon, Sun, Share2, LogOut } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface TopBarProps {
   user?: any;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
+  onLogout?: () => void;
 }
 
-export function TopBar({ user }: TopBarProps) {
+export function TopBar({ user, isDarkMode, onToggleDarkMode, onLogout }: TopBarProps) {
   return (
     <header className="flex justify-between items-center w-full px-8 py-4 sticky top-0 bg-background/80 backdrop-blur-xl z-40 font-headline tracking-tight shadow-[0_20px_40px_rgba(25,28,30,0.06)]">
       <div className="flex items-center gap-6 flex-1">
@@ -36,8 +39,15 @@ export function TopBar({ user }: TopBarProps) {
           <Bell className="w-5 h-5 text-on-surface-variant" />
         </button>
         
-        <button className="p-2 rounded-full hover:bg-surface-container-low transition-colors">
-          <Moon className="w-5 h-5 text-on-surface-variant" />
+        <button 
+          onClick={onToggleDarkMode}
+          className="p-2 rounded-full hover:bg-surface-container-low transition-colors"
+        >
+          {isDarkMode ? (
+            <Sun className="w-5 h-5 text-on-surface-variant" />
+          ) : (
+            <Moon className="w-5 h-5 text-on-surface-variant" />
+          )}
         </button>
         
         <div className="flex items-center gap-3 ml-2">
@@ -53,6 +63,15 @@ export function TopBar({ user }: TopBarProps) {
               referrerPolicy="no-referrer"
             />
           </div>
+          {onLogout && (
+            <button 
+              onClick={onLogout}
+              className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors ml-1"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
     </header>

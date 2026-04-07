@@ -87,7 +87,7 @@ export function AccessControl() {
                 ].map((module, idx) => (
                   <div key={idx} className="flex items-center justify-between p-5 rounded-2xl bg-surface-container-low group hover:bg-surface-container-high transition-all">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-primary shadow-sm">
+                      <div className="w-12 h-12 rounded-xl bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm">
                         <module.icon className="w-6 h-6" />
                       </div>
                       <div>
@@ -100,7 +100,7 @@ export function AccessControl() {
                       module.default ? "bg-primary" : "bg-outline-variant/30"
                     )}>
                       <div className={cn(
-                        "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                        "absolute top-1 w-4 h-4 bg-surface-container-lowest rounded-full transition-all",
                         module.default ? "right-1" : "left-1"
                       )} />
                     </div>
@@ -121,7 +121,7 @@ export function AccessControl() {
                       "flex-1 py-3 rounded-full font-bold text-sm transition-all",
                       duration === d 
                         ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                        : "bg-white border border-outline-variant/20 text-outline hover:bg-surface-container-low"
+                        : "bg-surface-container-lowest border border-outline-variant/20 text-outline hover:bg-surface-container-low"
                     )}
                   >
                     {d}

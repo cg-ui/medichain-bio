@@ -52,7 +52,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
             className={cn(
               "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group text-left w-full",
               activeTab === item.id 
-                ? "bg-white text-primary shadow-sm" 
+                ? "bg-surface-container-lowest text-primary shadow-sm" 
                 : "text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1"
             )}
           >

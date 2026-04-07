@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Shield, User, Stethoscope, Mail, Lock, Eye, EyeOff, ArrowRight, Chrome, Apple } from 'lucide-react';
+import { Shield, User, Stethoscope, Mail, Lock, Eye, EyeOff, ArrowRight, Chrome, Apple, Moon, Sun } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 
 interface AuthPageProps {
   onLogin: (user: any) => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
-export function AuthPage({ onLogin }: AuthPageProps) {
+export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState<'patient' | 'doctor'>('patient');
   const [email, setEmail] = useState('');
@@ -67,7 +69,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
             onClick={() => setRole('patient')}
             className={cn(
               "p-8 rounded-[2.5rem] border-2 text-left transition-all group",
-              role === 'patient' ? "border-primary bg-primary/5 shadow-xl" : "border-outline-variant/20 bg-white hover:border-primary/30"
+              role === 'patient' ? "border-primary bg-primary/5 shadow-xl" : "border-outline-variant/20 bg-surface-container-lowest hover:border-primary/30"
             )}
           >
             <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform">
@@ -82,7 +84,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
             onClick={() => setRole('doctor')}
             className={cn(
               "p-8 rounded-[2.5rem] border-2 text-left transition-all group",
-              role === 'doctor' ? "border-primary bg-primary/5 shadow-xl" : "border-outline-variant/20 bg-white hover:border-primary/30"
+              role === 'doctor' ? "border-primary bg-primary/5 shadow-xl" : "border-outline-variant/20 bg-surface-container-lowest hover:border-primary/30"
             )}
           >
             <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform">
@@ -110,13 +112,13 @@ export function AuthPage({ onLogin }: AuthPageProps) {
           <div className="flex bg-surface-container-low p-1 rounded-full mb-8">
             <button 
               onClick={() => setIsLogin(true)}
-              className={cn("flex-1 py-3 rounded-full text-sm font-bold transition-all", isLogin ? "bg-white shadow-sm text-primary" : "text-outline")}
+              className={cn("flex-1 py-3 rounded-full text-sm font-bold transition-all", isLogin ? "bg-surface-container-lowest shadow-sm text-primary" : "text-outline")}
             >
               Sign In
             </button>
             <button 
               onClick={() => setIsLogin(false)}
-              className={cn("flex-1 py-3 rounded-full text-sm font-bold transition-all", !isLogin ? "bg-white shadow-sm text-primary" : "text-outline")}
+              className={cn("flex-1 py-3 rounded-full text-sm font-bold transition-all", !isLogin ? "bg-surface-container-lowest shadow-sm text-primary" : "text-outline")}
             >
               Create Account
             </button>
@@ -214,9 +216,17 @@ export function AuthPage({ onLogin }: AuthPageProps) {
           <button className="hover:text-on-surface">Institutional Nodes</button>
           <button className="hover:text-on-surface">Blockchain Status</button>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 text-teal-600">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-600 animate-pulse" />
-          Secure Network: Active
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onToggleDarkMode}
+            className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-outline hover:text-on-surface"
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-600 dark:bg-teal-400 animate-pulse" />
+            Secure Network: Active
+          </div>
         </div>
       </div>
     </div>

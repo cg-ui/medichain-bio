@@ -27,7 +27,7 @@ export function Reports() {
         <div className="flex items-center gap-4">
           <div className="flex bg-surface-container-low p-1 rounded-full">
             {['Daily', 'Weekly', 'Monthly'].map((t) => (
-              <button key={t} className={cn("px-6 py-2 rounded-full text-sm font-bold transition-all", t === 'Weekly' ? "bg-white shadow-sm text-primary" : "text-outline hover:text-on-surface")}>
+              <button key={t} className={cn("px-6 py-2 rounded-full text-sm font-bold transition-all", t === 'Weekly' ? "bg-surface-container-lowest shadow-sm text-primary" : "text-outline hover:text-on-surface")}>
                 {t}
               </button>
             ))}
@@ -194,7 +194,7 @@ export function Reports() {
         </div>
         <div className="space-y-4">
           {auditLogs.map((log, idx) => (
-            <div key={idx} className="bg-white p-5 rounded-2xl flex items-center justify-between group hover:shadow-md transition-all">
+            <div key={idx} className="bg-surface-container-lowest p-5 rounded-2xl flex items-center justify-between group hover:shadow-md transition-all">
               <div className="grid grid-cols-3 flex-1">
                 <div>
                   <p className="text-[10px] font-bold text-outline uppercase mb-1">Timestamp</p>

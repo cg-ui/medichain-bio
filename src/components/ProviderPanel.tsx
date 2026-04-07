@@ -100,7 +100,7 @@ export function ProviderPanel() {
           </div>
           <div className="flex items-center gap-4">
             <div className="flex bg-surface-container-low p-1 rounded-full">
-              <button className="px-4 py-1.5 rounded-full bg-white shadow-sm text-xs font-bold">All</button>
+              <button className="px-4 py-1.5 rounded-full bg-surface-container-lowest shadow-sm text-xs font-bold">All</button>
               <button className="px-4 py-1.5 rounded-full text-xs font-bold text-outline">Critical</button>
               <button className="px-4 py-1.5 rounded-full text-xs font-bold text-outline">Stable</button>
             </div>

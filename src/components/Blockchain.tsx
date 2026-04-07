@@ -182,7 +182,7 @@ export function Blockchain() {
       {/* Bottom Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="bg-surface-container-low p-8 rounded-[2.5rem] flex items-center gap-6 group hover:bg-surface-container-high transition-all">
-          <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-primary shadow-sm group-hover:scale-110 transition-transform">
+          <div className="w-16 h-16 rounded-2xl bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm group-hover:scale-110 transition-transform">
             <RefreshCw className="w-8 h-8" />
           </div>
           <div>
@@ -191,7 +191,7 @@ export function Blockchain() {
           </div>
         </div>
         <div className="bg-surface-container-low p-8 rounded-[2.5rem] flex items-center gap-6 group hover:bg-surface-container-high transition-all">
-          <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-teal-600 shadow-sm group-hover:scale-110 transition-transform">
+          <div className="w-16 h-16 rounded-2xl bg-surface-container-lowest flex items-center justify-center text-teal-600 shadow-sm group-hover:scale-110 transition-transform">
             <Shield className="w-8 h-8" />
           </div>
           <div>

@@ -127,7 +127,7 @@ export function Emergency() {
           </div>
           <div className="space-y-6">
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-low">
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-primary shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm">
                 <Smartphone className="w-6 h-6" />
               </div>
               <div className="flex-1">
@@ -140,7 +140,7 @@ export function Emergency() {
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-low">
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-outline shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-surface-container-lowest flex items-center justify-center text-outline shadow-sm">
                 <Link className="w-6 h-6" />
               </div>
               <div className="flex-1">

@@ -29,6 +29,27 @@
   --radius-xl: 3rem;
 }
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --color-primary: #adc6ff;
+  --color-primary-container: #004494;
+  --color-secondary: #54d6f1;
+  --color-secondary-container: #004e5d;
+  --color-tertiary: #8ae2e7;
+  --color-tertiary-fixed: #004f52;
+  --color-background: #001e2f;
+  --color-surface: #001e2f;
+  --color-surface-container-low: #191c1e;
+  --color-surface-container-lowest: #0d141c;
+  --color-surface-container-high: #232a31;
+  --color-surface-container-highest: #2d353c;
+  --color-outline: #8d9199;
+  --color-outline-variant: #43474e;
+  --color-on-surface: #e2e2e6;
+  --color-on-surface-variant: #c3c6cf;
+}
+
 @layer base {
   body {
     @apply bg-background text-on-surface font-body;

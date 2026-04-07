@@ -41,6 +41,15 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -74,7 +83,13 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthPage onLogin={setUser} />;
+    return (
+      <AuthPage 
+        onLogin={setUser} 
+        isDarkMode={isDarkMode} 
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)} 
+      />
+    );
   }
 
   const renderContent = () => {
@@ -157,16 +172,21 @@ export default function App() {
       
       <main className="ml-64 flex-1 min-h-screen flex flex-col">
         {isDemo && (
-          <div className="bg-amber-50 border-b border-amber-200 px-8 py-2 flex items-center justify-between">
-            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-8 py-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
               Demo Mode: MongoDB not connected. Using in-memory storage.
             </p>
-            <p className="text-[10px] font-medium text-amber-600">
+            <p className="text-[10px] font-medium text-amber-600 dark:text-amber-500">
               Configure MONGODB_URI in Settings for persistence.
             </p>
           </div>
         )}
-        <TopBar user={user} />
+        <TopBar 
+          user={user} 
+          isDarkMode={isDarkMode} 
+          onToggleDarkMode={() => setIsDarkMode(!isDarkMode)} 
+          onLogout={handleLogout}
+        />
         
         {renderContent()}
 

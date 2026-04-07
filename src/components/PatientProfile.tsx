@@ -93,7 +93,7 @@ export function PatientProfile() {
           <div className="flex items-center justify-between">
             <h3 className="text-2xl font-headline font-bold text-on-surface">Medical History Timeline</h3>
             <div className="flex bg-surface-container-low p-1 rounded-full">
-              <button className="px-4 py-1.5 rounded-full bg-white shadow-sm text-xs font-bold">All Events</button>
+              <button className="px-4 py-1.5 rounded-full bg-surface-container-lowest shadow-sm text-xs font-bold">All Events</button>
               <button className="px-4 py-1.5 rounded-full text-xs font-bold text-outline">Diagnoses</button>
               <button className="px-4 py-1.5 rounded-full text-xs font-bold text-outline">Vaccinations</button>
             </div>
@@ -149,7 +149,7 @@ export function PatientProfile() {
           </div>
           <div className="space-y-4">
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-low group hover:bg-surface-container-high transition-all">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm">
                 <Watch className="w-5 h-5" />
               </div>
               <div className="flex-1">
@@ -159,7 +159,7 @@ export function PatientProfile() {
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             </div>
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-low group hover:bg-surface-container-high transition-all">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-teal-600 shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-surface-container-lowest flex items-center justify-center text-teal-600 shadow-sm">
                 <Activity className="w-5 h-5" />
               </div>
               <div className="flex-1">
