@@ -29,9 +29,10 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (id: string) => void;
   onLogout?: () => void;
+  onUploadClick?: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onLogout, onUploadClick }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-surface border-r-0 flex flex-col p-4 gap-2 z-50">
       <div className="flex items-center gap-3 px-3 py-6 mb-4">
@@ -66,6 +67,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
         <motion.button 
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          onClick={onUploadClick}
           className="w-full mb-4 py-3 px-4 rounded-xl bg-primary text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all"
         >
           <Upload className="w-4 h-4" />

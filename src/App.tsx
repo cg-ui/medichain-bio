@@ -17,6 +17,7 @@ import { Emergency } from './components/Emergency';
 import { Reports } from './components/Reports';
 import { Blockchain } from './components/Blockchain';
 import { AuthPage } from './components/AuthPage';
+import { UploadModal } from './components/UploadModal';
 import { Activity, Droplets, Thermometer, Plus, LogOut } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect } from 'react';
@@ -42,6 +43,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -168,7 +170,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
+      <Sidebar 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        onLogout={handleLogout} 
+        onUploadClick={() => setIsUploadModalOpen(true)}
+      />
       
       <main className="ml-64 flex-1 min-h-screen flex flex-col">
         {isDemo && (
@@ -189,6 +196,12 @@ export default function App() {
         />
         
         {renderContent()}
+
+        <UploadModal 
+          isOpen={isUploadModalOpen} 
+          onClose={() => setIsUploadModalOpen(false)} 
+          user={user}
+        />
 
         {/* Contextual FAB */}
         <motion.button 

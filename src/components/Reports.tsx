@@ -1,8 +1,9 @@
-import React from 'react';
-import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { fetchAuditLog } from '../services/blockchainService';
 
 const weeklyHeartRate = [
   { day: 'MON', value: 65, type: 'resting' },
@@ -14,12 +15,34 @@ const weeklyHeartRate = [
   { day: 'SUN', value: 75, type: 'active' },
 ];
 
-const auditLogs = [
-  { time: '12 Oct 2023 14:32', type: 'Lab Result Synced', hash: '0x7a...4e21' },
-  { time: '12 Oct 2023 11:05', type: 'Access Granted: Dr. Sarah W.', hash: '0xb1...88c4' },
-];
-
 export function Reports() {
+  const [blockchainLogs, setBlockchainLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLogs = async () => {
+      try {
+        setLoadingLogs(true);
+        // In a real app, we'd pass the current patient's address
+        const logs = await fetchAuditLog();
+        setBlockchainLogs(logs);
+      } catch (err: any) {
+        console.error("Failed to fetch blockchain logs:", err);
+        setError(err.message || "Failed to connect to blockchain");
+        // Fallback to mock data for demo if blockchain fails
+        setBlockchainLogs([
+          { formattedDate: '12 Oct 2023 14:32', recordType: 'Lab Result Synced (Mock)', transactionHash: '0x7a...4e21' },
+          { formattedDate: '12 Oct 2023 11:05', recordType: 'Access Granted: Dr. Sarah W. (Mock)', transactionHash: '0xb1...88c4' },
+        ]);
+      } finally {
+        setLoadingLogs(false);
+      }
+    };
+
+    loadLogs();
+  }, []);
+
   return (
     <div className="p-8 max-w-[1600px] mx-auto w-full space-y-8">
       {/* Header & Filters */}
@@ -193,30 +216,44 @@ export function Reports() {
           <h3 className="text-xl font-headline font-bold text-on-surface">Immutable Audit Log</h3>
         </div>
         <div className="space-y-4">
-          {auditLogs.map((log, idx) => (
-            <div key={idx} className="bg-surface-container-lowest p-5 rounded-2xl flex items-center justify-between group hover:shadow-md transition-all">
-              <div className="grid grid-cols-3 flex-1">
-                <div>
-                  <p className="text-[10px] font-bold text-outline uppercase mb-1">Timestamp</p>
-                  <p className="text-sm font-bold text-on-surface">{log.time}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-outline uppercase mb-1">Activity Type</p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-teal-500" />
-                    <p className="text-sm font-bold text-on-surface">{log.type}</p>
+          {loadingLogs ? (
+            <div className="flex flex-col items-center justify-center py-12 text-outline">
+              <Loader2 className="w-8 h-8 animate-spin mb-4" />
+              <p className="text-sm font-bold">Synchronizing with Blockchain...</p>
+            </div>
+          ) : blockchainLogs.length > 0 ? (
+            blockchainLogs.map((log, idx) => (
+              <div key={idx} className="bg-surface-container-lowest p-5 rounded-2xl flex items-center justify-between group hover:shadow-md transition-all">
+                <div className="grid grid-cols-3 flex-1">
+                  <div>
+                    <p className="text-[10px] font-bold text-outline uppercase mb-1">Timestamp</p>
+                    <p className="text-sm font-bold text-on-surface">{log.formattedDate}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-outline uppercase mb-1">Activity Type</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-teal-500" />
+                      <p className="text-sm font-bold text-on-surface">{log.recordType}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-outline uppercase mb-1">Integrity Hash</p>
+                    <p className="text-sm font-mono text-outline truncate max-w-[150px]">{log.transactionHash}</p>
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-outline uppercase mb-1">Integrity Hash</p>
-                  <p className="text-sm font-mono text-outline">{log.hash}</p>
-                </div>
+                <button 
+                  onClick={() => window.open(`https://sepolia.etherscan.io/tx/${log.transactionHash}`, '_blank')}
+                  className="p-2 rounded-xl hover:bg-surface-container-low text-outline group-hover:text-primary transition-all"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                </button>
               </div>
-              <button className="p-2 rounded-xl hover:bg-surface-container-low text-outline group-hover:text-primary transition-all">
-                <ExternalLink className="w-5 h-5" />
-              </button>
+            ))
+          ) : (
+            <div className="text-center py-12 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/30">
+              <p className="text-sm font-bold text-outline">No immutable records found on-chain.</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
