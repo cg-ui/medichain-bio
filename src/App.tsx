@@ -20,10 +20,12 @@ import { AuthPage } from './components/AuthPage';
 import { UploadModal } from './components/UploadModal';
 import { MedicalUpdateModal } from './components/MedicalUpdateModal';
 import { VitalsProvider, useVitals } from './context/VitalsContext';
+import { AuthProvider } from './context/AuthContext';
 import { Activity, Droplets, Thermometer, Plus, LogOut, Stethoscope, Syringe, ClipboardList, Upload as UploadIcon, BrainCircuit, AlertTriangle, Info as InfoIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useEffect } from 'react';
 import { cn } from '@/src/lib/utils';
+import { Toaster } from 'sonner';
 
 const heartRateData = [
   { value: 60 }, { value: 55 }, { value: 65 }, { value: 70 }, 
@@ -41,16 +43,20 @@ const tempData = [
 ];
 
 export default function App() {
+  const [user, setUser] = useState<any>(null);
+
   return (
-    <VitalsProvider>
-      <AppContent />
-    </VitalsProvider>
+    <AuthProvider initialUser={user}>
+      <VitalsProvider>
+        <Toaster position="top-right" richColors />
+        <AppContent user={user} setUser={setUser} />
+      </VitalsProvider>
+    </AuthProvider>
   );
 }
 
-function AppContent() {
+function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void }) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);

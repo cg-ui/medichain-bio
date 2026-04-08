@@ -14,8 +14,30 @@ contract MediChainRecords {
         address uploader;
     }
 
+    struct AccessGrant {
+        address doctor;
+        string[] modules;
+        uint256 expiry;
+        bool active;
+    }
+
+    struct EmergencyAccess {
+        string reason;
+        uint256 expiry;
+        bool active;
+    }
+
     // Mapping from patient address to their records
     mapping(address => MedicalRecord[]) private patientRecords;
+    
+    // Mapping from patient to doctor to their access grant
+    mapping(address => mapping(address => AccessGrant)) public grants;
+    // Track doctors who have access for a patient
+    mapping(address => address[]) private patientDoctors;
+
+    // Emergency Access
+    mapping(address => bool) public emergencyUnlock;
+    mapping(address => mapping(address => EmergencyAccess)) public emergencyGrants;
     
     // Role management
     mapping(address => bool) public authorizedUploaders;
@@ -27,6 +49,30 @@ contract MediChainRecords {
         string recordType,
         uint256 timestamp,
         address indexed uploader
+    );
+
+    event AccessGranted(
+        address indexed patient,
+        address indexed doctor,
+        string[] modules,
+        uint256 expiry
+    );
+
+    event AccessRevoked(
+        address indexed patient,
+        address indexed doctor
+    );
+
+    event EmergencyUnlockToggled(
+        address indexed patient,
+        bool status
+    );
+
+    event EmergencyAccessGranted(
+        address indexed patient,
+        address indexed doctor,
+        string reason,
+        uint256 expiry
     );
 
     modifier onlyOwner() {
@@ -95,5 +141,98 @@ contract MediChainRecords {
      */
     function getPatientRecords(address _patientAddress) external view returns (MedicalRecord[] memory) {
         return patientRecords[_patientAddress];
+    }
+
+    /**
+     * @dev Grant access to a doctor for specific data modules
+     */
+    function grantAccess(address _doctor, string[] calldata _modules, uint256 _duration) external {
+        uint256 expiry = block.timestamp + _duration;
+        
+        grants[msg.sender][_doctor] = AccessGrant({
+            doctor: _doctor,
+            modules: _modules,
+            expiry: expiry,
+            active: true
+        });
+
+        // Add to patientDoctors list if not already there
+        bool exists = false;
+        for (uint i = 0; i < patientDoctors[msg.sender].length; i++) {
+            if (patientDoctors[msg.sender][i] == _doctor) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            patientDoctors[msg.sender].push(_doctor);
+        }
+
+        emit AccessGranted(msg.sender, _doctor, _modules, expiry);
+    }
+
+    /**
+     * @dev Revoke access from a doctor
+     */
+    function revokeAccess(address _doctor) external {
+        grants[msg.sender][_doctor].active = false;
+        emit AccessRevoked(msg.sender, _doctor);
+    }
+
+    /**
+     * @dev Get all doctors who have (or had) access for a patient
+     */
+    function getPatientDoctors(address _patient) external view returns (address[] memory) {
+        return patientDoctors[_patient];
+    }
+
+    /**
+     * @dev Check if a doctor has active access to a patient's data
+     */
+    function hasAccess(address _patient, address _doctor) external view returns (bool) {
+        // Check standard grant
+        AccessGrant memory grant = grants[_patient][_doctor];
+        if (grant.active && block.timestamp < grant.expiry) {
+            return true;
+        }
+
+        // Check global emergency unlock
+        if (emergencyUnlock[_patient]) {
+            return true;
+        }
+
+        // Check specific emergency grant
+        EmergencyAccess memory eGrant = emergencyGrants[_patient][_doctor];
+        if (eGrant.active && block.timestamp < eGrant.expiry) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @dev Toggle emergency unlock status for the caller (patient)
+     */
+    function toggleEmergencyUnlock(bool _status) external {
+        emergencyUnlock[msg.sender] = _status;
+        emit EmergencyUnlockToggled(msg.sender, _status);
+    }
+
+    /**
+     * @dev Request emergency access to a patient's records
+     * @param _patient The address of the patient
+     * @param _reason The reason for emergency access
+     */
+    function grantEmergencyAccess(address _patient, string calldata _reason) external {
+        // Emergency access is time-bound to 24 hours
+        uint256 expiry = block.timestamp + 24 hours;
+        
+        emergencyGrants[_patient][msg.sender] = EmergencyAccess({
+            reason: _reason,
+            expiry: expiry,
+            active: true
+        });
+
+        emit EmergencyAccessGranted(_patient, msg.sender, _reason, expiry);
     }
 }

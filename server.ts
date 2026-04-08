@@ -40,6 +40,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: ["patient", "doctor"], required: true },
+  name: { type: String },
+  walletAddress: { type: String },
 });
 
 const User = mongoose.model("User", userSchema);
@@ -50,18 +52,31 @@ const mockUsers: any[] = [];
 // Auth Routes
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, name, walletAddress } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
 
     if (isDbConnected) {
-      const user = new User({ email, password: hashedPassword, role });
+      const user = new User({ 
+        email, 
+        password: hashedPassword, 
+        role,
+        name: name || email.split('@')[0],
+        walletAddress: walletAddress || ""
+      });
       await user.save();
     } else {
       // Mock signup
       if (mockUsers.find(u => u.email === email)) {
         return res.status(400).json({ error: "User already exists" });
       }
-      mockUsers.push({ _id: Date.now().toString(), email, password: hashedPassword, role });
+      mockUsers.push({ 
+        _id: Date.now().toString(), 
+        email, 
+        password: hashedPassword, 
+        role,
+        name: name || email.split('@')[0],
+        walletAddress: walletAddress || ""
+      });
     }
     
     res.status(201).json({ message: "User created" });
@@ -115,6 +130,52 @@ app.get("/api/auth/me", async (req, res) => {
     res.json({ user, isDemo: !isDbConnected });
   } catch (error) {
     res.status(401).json({ error: "Invalid token" });
+  }
+});
+
+app.post("/api/auth/update-wallet", async (req, res) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const { walletAddress } = req.body;
+
+    if (isDbConnected) {
+      await User.findByIdAndUpdate(decoded.userId, { walletAddress });
+    } else {
+      const user = mockUsers.find(u => u._id === decoded.userId);
+      if (user) user.walletAddress = walletAddress;
+    }
+
+    res.json({ message: "Wallet updated" });
+  } catch (error) {
+    res.status(500).json({ error: "Update failed" });
+  }
+});
+
+// User Directory Routes
+app.get("/api/users/resolve/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    let user;
+
+    if (isDbConnected) {
+      user = await User.findOne({ email: email.toLowerCase(), role: "patient" });
+    } else {
+      user = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.role === "patient");
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "Patient not found" });
+    }
+
+    res.json({
+      email: user.email,
+      address: user.walletAddress || null,
+      name: user.name || user.email.split('@')[0]
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Resolution failed" });
   }
 });
 

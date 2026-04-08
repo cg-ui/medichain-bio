@@ -1,7 +1,11 @@
-import React from 'react';
-import { Shield, Activity, Lock, Clock, UserPlus, MoreVertical, BarChart2, ChevronLeft, ChevronRight, Zap, History, FileCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Shield, Activity, Lock, Clock, UserPlus, MoreVertical, BarChart2, ChevronLeft, ChevronRight, Zap, History, FileCheck, AlertTriangle, Search, Loader2, ShieldAlert } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { checkEmergencyUnlock, grantEmergencyAccessOnChain, simulateGrantEmergencyAccess, checkHasAccess } from '@/src/services/blockchainService';
+import { toast } from 'sonner';
+import { useAuth } from '@/src/context/AuthContext';
+import { ethers } from 'ethers';
 
 const patients = [
   {
@@ -51,8 +55,166 @@ const patients = [
 ];
 
 export function ProviderPanel() {
+  const [patientEmail, setPatientEmail] = useState('');
+  const [patientAddress, setPatientAddress] = useState('');
+  const [reason, setReason] = useState('');
+  const [isChecking, setIsChecking] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [emergencyStatus, setEmergencyStatus] = useState<{
+    unlocked: boolean;
+    hasAccess: boolean;
+    checked: boolean;
+  } | null>(null);
+  const { userAddress } = useAuth();
+
+  const handleCheckAccess = async () => {
+    if (!patientAddress || !ethers.isAddress(patientAddress)) {
+      toast.error("Please enter a valid patient wallet address");
+      return;
+    }
+
+    setIsChecking(true);
+    try {
+      const unlocked = await checkEmergencyUnlock(patientAddress);
+      const hasAccess = await checkHasAccess(patientAddress, userAddress || '');
+      
+      setEmergencyStatus({
+        unlocked,
+        hasAccess,
+        checked: true
+      });
+
+      if (unlocked || hasAccess) {
+        toast.success("Access verified! You can now view the patient's reports.");
+      } else {
+        toast.info("Patient has not enabled emergency unlock. You may request temporary access.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to check emergency status");
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const handleRequestEmergencyAccess = async () => {
+    if (!patientAddress || !reason) {
+      toast.error("Please provide patient address and a valid reason");
+      return;
+    }
+
+    setIsRequesting(true);
+    try {
+      const useMetaMask = window.confirm("Confirm emergency access request on-chain? (Cancel for simulation)");
+      
+      if (useMetaMask) {
+        await grantEmergencyAccessOnChain(patientAddress, reason);
+      } else {
+        await simulateGrantEmergencyAccess(patientAddress, userAddress || '', reason);
+      }
+      
+      toast.success("Emergency access granted for 24 hours");
+      setEmergencyStatus(prev => prev ? { ...prev, hasAccess: true } : null);
+      
+      // Notify patient (simulated)
+      console.log(`Notification sent to patient ${patientAddress}: Doctor ${userAddress} accessed your records via emergency protocol.`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to request emergency access");
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
   return (
     <div className="p-8 max-w-[1600px] mx-auto w-full space-y-8">
+      {/* Emergency Access Portal */}
+      <div className="bg-red-50 border border-red-200 rounded-[2.5rem] p-8 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <ShieldAlert className="w-6 h-6 text-red-600" />
+          <h3 className="text-xl font-headline font-bold text-red-900">Emergency Access Portal</h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <p className="text-sm text-red-800 font-medium">Access patient records directly if they have enabled Emergency Unlock, or request temporary 24-hour access.</p>
+            
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-outline" />
+              <input 
+                type="text"
+                placeholder="Enter Patient Wallet Address (0x...)"
+                value={patientAddress}
+                onChange={(e) => setPatientAddress(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+              />
+            </div>
+
+            <button 
+              onClick={handleCheckAccess}
+              disabled={isChecking}
+              className="w-full py-3 rounded-2xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+              Check Emergency Status
+            </button>
+          </div>
+
+          {emergencyStatus?.checked && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white p-6 rounded-2xl border border-red-100 space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-outline uppercase tracking-wider">Status Report</span>
+                {emergencyStatus.unlocked ? (
+                  <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">UNLOCKED</span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">LOCKED</span>
+                )}
+              </div>
+
+              {emergencyStatus.unlocked || emergencyStatus.hasAccess ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-green-50 border border-green-100">
+                    <p className="text-sm font-bold text-green-900">Access Granted</p>
+                    <p className="text-xs text-green-700">You have active permission to view this patient's records.</p>
+                  </div>
+                  <button 
+                    onClick={() => window.location.href = `/reports?patient=${patientAddress}`}
+                    className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary-dark transition-all"
+                  >
+                    View Patient Reports
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
+                    <p className="text-sm font-bold text-amber-900">Access Restricted</p>
+                    <p className="text-xs text-amber-700">Provide a reason to request 24-hour emergency access.</p>
+                  </div>
+                  <textarea 
+                    placeholder="Reason for emergency access (e.g., Unconscious patient, Trauma)..."
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    className="w-full p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 min-h-[100px]"
+                  />
+                  <button 
+                    onClick={handleRequestEmergencyAccess}
+                    disabled={isRequesting}
+                    className="w-full py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isRequesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                    Execute Emergency Grant
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+      </div>
+
       {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-sm border border-outline-variant/10 relative overflow-hidden">

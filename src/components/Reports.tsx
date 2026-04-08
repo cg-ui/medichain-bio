@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2, RefreshCw, BrainCircuit, AlertTriangle, Info as InfoIcon, Copy, Check } from 'lucide-react';
+import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2, RefreshCw, BrainCircuit, AlertTriangle, Info as InfoIcon, Copy, Check, ShieldAlert } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { fetchAuditLog } from '../services/blockchainService';
+import { fetchAuditLog, isContractDeployed } from '../services/blockchainService';
+import { resolveEmailToAddress } from '../services/userService';
 import { useVitals } from '../context/VitalsContext';
 
 const weeklyHeartRate = [
@@ -21,7 +22,12 @@ export function Reports() {
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isContractDetected, setIsContractDetected] = useState(true);
   const { heartRate, spo2, temp, aiSignals } = useVitals();
+  
+  // Get patient address from URL if accessing as a doctor
+  const queryParams = new URLSearchParams(window.location.search);
+  const targetPatient = queryParams.get('patient');
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -32,21 +38,38 @@ export function Reports() {
   const loadLogs = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setLoadingLogs(true);
-      // In a real app, we'd pass the current patient's address
-      const logs = await fetchAuditLog();
-      setBlockchainLogs(logs);
       setError(null);
+
+      let patientToFetch = targetPatient || undefined;
+
+      // If targetPatient is an email, try to resolve it first
+      if (targetPatient && !targetPatient.startsWith('0x')) {
+        console.log("Resolving email to address for reports:", targetPatient);
+        const resolved = await resolveEmailToAddress(targetPatient);
+        if (resolved) {
+          patientToFetch = resolved;
+        } else {
+          console.warn("Could not resolve email to address, using as is");
+        }
+      }
+
+      const logs = await fetchAuditLog(patientToFetch);
+      setBlockchainLogs(logs);
     } catch (err: any) {
       console.error("Failed to fetch blockchain logs:", err);
       setError(err.message || "Failed to connect to blockchain");
-      // Fallback logic...
     } finally {
       setLoadingLogs(false);
     }
-  }, []);
+  }, [targetPatient]);
 
   useEffect(() => {
-    loadLogs();
+    const init = async () => {
+      const deployed = await isContractDeployed();
+      setIsContractDetected(deployed);
+      loadLogs();
+    };
+    init();
     
     const handleRefresh = () => loadLogs(false);
     window.addEventListener('blockchain-update', handleRefresh);
@@ -55,6 +78,40 @@ export function Reports() {
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto w-full space-y-8">
+      {targetPatient && (
+        <div className="bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="w-5 h-5 text-red-600" />
+            <span className="text-sm font-bold text-red-900">Emergency Access Active: Viewing records for {targetPatient}</span>
+          </div>
+          <button 
+            onClick={() => window.location.href = '/dashboard'}
+            className="text-xs font-bold text-red-600 hover:underline"
+          >
+            Exit Emergency View
+          </button>
+        </div>
+      )}
+      {error && (
+        <div className="bg-amber-50 border border-amber-200 p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-bold text-amber-900">Connection Issue</h4>
+              <p className="text-sm text-amber-700">{error}. Showing local records only.</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => loadLogs()}
+            className="px-6 py-2.5 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-all flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" /> Retry Sync
+          </button>
+        </div>
+      )}
+
       {/* Header & Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -69,9 +126,17 @@ export function Reports() {
             </button>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-8 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all">
-          <Download className="w-5 h-5" /> Download Report
-        </button>
+        <div className="flex items-center gap-3">
+          {!isContractDetected && (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Simulation Mode</span>
+            </div>
+          )}
+          <button className="flex items-center gap-2 px-8 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all">
+            <Download className="w-5 h-5" /> Download Report
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -244,6 +309,64 @@ export function Reports() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Medical Reports Section */}
+      <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-sm border border-outline-variant/10">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-primary" />
+            <h3 className="text-xl font-headline font-bold text-on-surface">Clinical Reports & Documents</h3>
+          </div>
+          <span className="text-xs font-bold text-outline uppercase tracking-widest">
+            {loadingLogs ? 'Synchronizing...' : `${blockchainLogs.filter(l => !l.ipfsHash.includes('_')).length} Documents Found`}
+          </span>
+        </div>
+
+        {loadingLogs ? (
+          <div className="flex flex-col items-center justify-center py-12 text-outline">
+            <Loader2 className="w-8 h-8 animate-spin mb-4" />
+            <p className="text-sm font-bold">Fetching Clinical Documents...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {blockchainLogs.filter(l => !l.ipfsHash.includes('_')).map((report, idx) => (
+              <motion.div 
+                key={idx}
+                whileHover={{ y: -5 }}
+                className="bg-surface-container-low p-6 rounded-3xl border border-outline-variant/5 hover:border-primary/20 transition-all"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <span className="text-[10px] font-bold text-outline">{report.formattedDate}</span>
+                </div>
+                <h4 className="font-bold text-on-surface mb-1 truncate">{report.recordType}</h4>
+                <p className="text-[10px] font-mono text-outline mb-6 truncate">CID: {report.ipfsHash}</p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => window.open(`https://ipfs.io/ipfs/${report.ipfsHash}`, '_blank')}
+                    className="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-dark transition-all flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" /> View Report
+                  </button>
+                  <button 
+                    onClick={() => copyToClipboard(report.ipfsHash, `rep-${idx}`)}
+                    className="p-2.5 rounded-xl bg-surface-container-highest text-outline hover:text-primary transition-all"
+                  >
+                    {copiedId === `rep-${idx}` ? <Check className="w-4 h-4 text-teal-500" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+            {blockchainLogs.filter(l => !l.ipfsHash.includes('_')).length === 0 && (
+              <div className="col-span-full py-12 text-center border border-dashed border-outline-variant/30 rounded-3xl">
+                <p className="text-sm font-bold text-outline">No clinical documents found for this patient.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Immutable Audit Log */}

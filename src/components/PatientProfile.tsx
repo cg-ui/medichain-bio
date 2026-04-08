@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Watch, Smartphone, RefreshCw, Plus, Lock, Info, Clock, CheckCircle2, Activity, Edit3, Copy, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Watch, Smartphone, RefreshCw, Plus, Lock, Info, Clock, CheckCircle2, Activity, Edit3, Copy, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { EditProfileModal } from './EditProfileModal';
+import { toggleEmergencyUnlockOnChain, simulateToggleEmergencyUnlock, checkEmergencyUnlock } from '@/src/services/blockchainService';
+import { useAuth } from '@/src/context/AuthContext';
+import { toast } from 'sonner';
 
 const initialTimeline = [
   {
@@ -48,6 +51,49 @@ export function PatientProfile() {
   });
   const [timeline, setTimeline] = useState(initialTimeline);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isEmergencyUnlockEnabled, setIsEmergencyUnlockEnabled] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+  const { userAddress } = useAuth();
+
+  useEffect(() => {
+    const loadEmergencyState = async () => {
+      if (userAddress) {
+        const status = await checkEmergencyUnlock(userAddress);
+        setIsEmergencyUnlockEnabled(status);
+      }
+    };
+    loadEmergencyState();
+  }, [userAddress]);
+
+  const handleToggleEmergencyUnlock = async () => {
+    if (!userAddress) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    setIsToggling(true);
+    try {
+      // For demo purposes, we'll ask if they want to simulate or use MetaMask
+      const useMetaMask = window.confirm("Use MetaMask for this transaction? (Cancel for simulation)");
+      
+      if (useMetaMask) {
+        await toggleEmergencyUnlockOnChain(!isEmergencyUnlockEnabled);
+      } else {
+        await simulateToggleEmergencyUnlock(userAddress, !isEmergencyUnlockEnabled);
+      }
+      
+      setIsEmergencyUnlockEnabled(!isEmergencyUnlockEnabled);
+      toast.success(`Emergency Unlock ${!isEmergencyUnlockEnabled ? 'Enabled' : 'Disabled'}`);
+      
+      // Refresh audit log
+      window.dispatchEvent(new CustomEvent('medical-history-update'));
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to toggle emergency unlock");
+    } finally {
+      setIsToggling(false);
+    }
+  };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -224,6 +270,62 @@ export function PatientProfile() {
               <Plus className="w-4 h-4" /> Connect New Device
             </button>
           </div>
+        </div>
+
+        {/* Emergency Protocol */}
+        <div className={cn(
+          "p-8 rounded-[2.5rem] shadow-sm border transition-all duration-500",
+          isEmergencyUnlockEnabled 
+            ? "bg-red-50 border-red-200" 
+            : "bg-surface-container-lowest border-outline-variant/10"
+        )}>
+          <div className="flex items-center justify-between mb-6">
+            <h4 className={cn(
+              "font-headline font-bold",
+              isEmergencyUnlockEnabled ? "text-red-900" : "text-on-surface"
+            )}>Emergency Protocol</h4>
+            <AlertTriangle className={cn(
+              "w-5 h-5",
+              isEmergencyUnlockEnabled ? "text-red-600 animate-pulse" : "text-outline"
+            )} />
+          </div>
+          
+          <p className="text-xs text-outline mb-6">
+            When enabled, all your medical reports and vitals become accessible to any doctor in an emergency situation.
+          </p>
+
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-white/50 backdrop-blur-sm border border-outline-variant/10">
+            <div>
+              <p className="text-sm font-bold text-on-surface">Emergency Unlock</p>
+              <p className="text-[10px] text-outline font-bold uppercase tracking-wider">
+                {isEmergencyUnlockEnabled ? 'Global Access Active' : 'Restricted Access'}
+              </p>
+            </div>
+            <button 
+              onClick={handleToggleEmergencyUnlock}
+              disabled={isToggling}
+              className={cn(
+                "w-12 h-6 rounded-full relative transition-all duration-300 flex items-center px-1",
+                isEmergencyUnlockEnabled ? "bg-red-600" : "bg-outline-variant/30",
+                isToggling && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <motion.div 
+                animate={{ x: isEmergencyUnlockEnabled ? 24 : 0 }}
+                className="w-4 h-4 bg-white rounded-full shadow-sm flex items-center justify-center"
+              >
+                {isToggling && <Loader2 className="w-2 h-2 animate-spin text-primary" />}
+              </motion.div>
+            </button>
+          </div>
+
+          {isEmergencyUnlockEnabled && (
+            <div className="mt-4 p-4 rounded-2xl bg-red-100/50 border border-red-200">
+              <p className="text-[10px] text-red-800 font-bold leading-tight">
+                CRITICAL: Your records are currently globally accessible. Disable this once the emergency is resolved.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Access Sovereignty */}

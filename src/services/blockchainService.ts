@@ -13,6 +13,20 @@ const CONTRACT_ADDRESS = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
 const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111
 
 /**
+ * Checks if the contract is deployed on the current network
+ */
+export async function isContractDeployed(): Promise<boolean> {
+  if (!window.ethereum) return false;
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const code = await provider.getCode(CONTRACT_ADDRESS);
+    return code !== '0x' && code !== '0x0';
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
  * Ensures the user is connected to the Sepolia network
  */
 export async function ensureSepoliaNetwork() {
@@ -194,28 +208,78 @@ export async function addRecordOnChain(
 }
 
 /**
- * Fetches the audit log by querying MedicalRecordAdded events
+ * Fetches the audit log by querying multiple events from the blockchain
  */
 export async function fetchAuditLog(patientAddress?: string) {
-  const allLogs = [...JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]')];
+  let allLogs = [...JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]')];
 
-  if (!window.ethereum) {
-    console.warn("MetaMask not detected, returning simulated logs only.");
+  // Validate address if provided
+  const isZeroAddress = patientAddress === '0x0000000000000000000000000000000000000000';
+  const isValidAddress = patientAddress && ethers.isAddress(patientAddress) && !isZeroAddress;
+  const filterAddress = isValidAddress ? patientAddress : null;
+
+  // Filter simulated logs by patient address or email if provided
+  if (patientAddress) {
+    allLogs = allLogs.filter(log => 
+      (log.patientAddress && log.patientAddress.toLowerCase() === patientAddress.toLowerCase()) ||
+      (log.patientEmail && log.patientEmail.toLowerCase() === patientAddress.toLowerCase())
+    );
+  }
+
+  if (!window.ethereum || isZeroAddress || !isValidAddress) {
     return allLogs;
   }
 
   try {
     const provider = new ethers.BrowserProvider(window.ethereum);
+    
+    // Check network first to avoid hanging on wrong network
+    const network = await provider.getNetwork();
+    if (network.chainId !== BigInt(11155111)) { // Sepolia
+      console.warn("Not on Sepolia network, skipping blockchain log fetch");
+      return allLogs;
+    }
+
+    // Check if contract exists on this network
+    const code = await provider.getCode(CONTRACT_ADDRESS);
+    if (code === '0x' || code === '0x0') {
+      console.warn("Contract not deployed on this network, skipping blockchain log fetch");
+      return allLogs;
+    }
+
     const contract = new ethers.Contract(
       CONTRACT_ADDRESS,
       MediChainArtifact.abi,
       provider
     );
 
-    const filter = contract.filters.MedicalRecordAdded(patientAddress);
-    const events = await contract.queryFilter(filter, -10000); // Increased range to 10k blocks
+    // Timeout helper
+    const withTimeout = (promise: Promise<any>, ms: number) => 
+      Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+      ]);
 
-    const chainLogs = events.map(event => {
+    console.log(`Fetching blockchain logs for ${filterAddress || 'all patients'}...`);
+
+    // Define all filters
+    const filters = [
+      contract.filters.MedicalRecordAdded(filterAddress),
+      contract.filters.AccessGranted(filterAddress),
+      contract.filters.AccessRevoked(filterAddress),
+      contract.filters.EmergencyUnlockToggled(filterAddress),
+      contract.filters.EmergencyAccessGranted(filterAddress)
+    ];
+
+    // Fetch all events in parallel with a 4-second timeout (faster)
+    const eventResults = await withTimeout(
+      Promise.all(filters.map(f => contract.queryFilter(f, -3000))), // Last 3000 blocks for speed
+      5000
+    );
+
+    const [recordEvents, grantEvents, revokeEvents, unlockEvents, eGrantEvents] = eventResults;
+
+    const chainLogs = recordEvents.map(event => {
       const { patientAddress, ipfsHash, recordType, timestamp, uploader } = (event as any).args;
       return {
         patientAddress,
@@ -228,9 +292,351 @@ export async function fetchAuditLog(patientAddress?: string) {
       };
     });
 
-    return [...allLogs, ...chainLogs].sort((a, b) => b.timestamp - a.timestamp);
+    const grantLogs = grantEvents.map(event => {
+      const { patient, doctor, modules, expiry } = (event as any).args;
+      return {
+        patientAddress: patient,
+        ipfsHash: "ACCESS_GRANT",
+        recordType: `Access Granted: ${doctor}`,
+        timestamp: Number(expiry) - 86400,
+        uploader: patient,
+        transactionHash: event.transactionHash,
+        formattedDate: new Date((Number(expiry) - 86400) * 1000).toLocaleString()
+      };
+    });
+
+    const revokeLogs = revokeEvents.map(event => {
+      const { patient, doctor } = (event as any).args;
+      return {
+        patientAddress: patient,
+        ipfsHash: "ACCESS_REVOKE",
+        recordType: `Access Revoked: ${doctor}`,
+        timestamp: Math.floor(Date.now() / 1000), // Fallback
+        uploader: patient,
+        transactionHash: event.transactionHash,
+        formattedDate: new Date().toLocaleString()
+      };
+    });
+
+    const unlockLogs = unlockEvents.map(event => {
+      const { patient, status } = (event as any).args;
+      return {
+        patientAddress: patient,
+        ipfsHash: "EMERGENCY_TOGGLE",
+        recordType: `Emergency Unlock: ${status ? 'ENABLED' : 'DISABLED'}`,
+        timestamp: Math.floor(Date.now() / 1000),
+        uploader: patient,
+        transactionHash: event.transactionHash,
+        formattedDate: new Date().toLocaleString()
+      };
+    });
+
+    const eGrantLogs = eGrantEvents.map(event => {
+      const { patient, doctor, reason, expiry } = (event as any).args;
+      return {
+        patientAddress: patient,
+        ipfsHash: "EMERGENCY_GRANT",
+        recordType: `Emergency Access: ${doctor} (Reason: ${reason})`,
+        timestamp: Number(expiry) - 86400,
+        uploader: doctor,
+        transactionHash: event.transactionHash,
+        formattedDate: new Date((Number(expiry) - 86400) * 1000).toLocaleString()
+      };
+    });
+
+    return [...allLogs, ...chainLogs, ...grantLogs, ...revokeLogs, ...unlockLogs, ...eGrantLogs]
+      .sort((a, b) => b.timestamp - a.timestamp);
+
   } catch (err) {
-    console.error("Failed to fetch from blockchain, returning simulated logs:", err);
+    console.warn("Failed to fetch from blockchain, returning simulated logs:", err);
     return allLogs;
   }
+}
+
+/**
+ * Grants access to a doctor on-chain
+ */
+export async function grantAccessOnChain(doctorAddress: string, modules: string[], duration: number) {
+  if (!window.ethereum) throw new Error("MetaMask is not installed");
+
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  
+  const contract = new ethers.Contract(
+    CONTRACT_ADDRESS,
+    MediChainArtifact.abi,
+    signer
+  );
+
+  console.log(`Granting access to ${doctorAddress} for ${modules.join(', ')}...`);
+  
+  const tx = await contract.grantAccess(doctorAddress, modules, duration);
+  const receipt = await tx.wait();
+  
+  return receipt;
+}
+
+/**
+ * Revokes access from a doctor on-chain
+ */
+export async function revokeAccessOnChain(doctorAddress: string) {
+  if (!window.ethereum) throw new Error("MetaMask is not installed");
+
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  
+  const contract = new ethers.Contract(
+    CONTRACT_ADDRESS,
+    MediChainArtifact.abi,
+    signer
+  );
+
+  console.log(`Revoking access from ${doctorAddress}...`);
+  
+  const tx = await contract.revokeAccess(doctorAddress);
+  const receipt = await tx.wait();
+  
+  return receipt;
+}
+
+/**
+ * Toggles emergency unlock status on-chain
+ */
+export async function toggleEmergencyUnlockOnChain(status: boolean) {
+  if (!window.ethereum) throw new Error("MetaMask is not installed");
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, signer);
+  
+  const tx = await contract.toggleEmergencyUnlock(status);
+  return await tx.wait();
+}
+
+/**
+ * Grants emergency access to a patient's records on-chain
+ */
+export async function grantEmergencyAccessOnChain(patientAddress: string, reason: string) {
+  if (!window.ethereum) throw new Error("MetaMask is not installed");
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, signer);
+  
+  const tx = await contract.grantEmergencyAccess(patientAddress, reason);
+  return await tx.wait();
+}
+
+/**
+ * Checks if a patient has emergency unlock enabled
+ */
+export async function checkEmergencyUnlock(patientAddress: string): Promise<boolean> {
+  const isZeroAddress = patientAddress === '0x0000000000000000000000000000000000000000';
+  if (!window.ethereum || !ethers.isAddress(patientAddress) || isZeroAddress) {
+    // Fallback to simulation state if no wallet or invalid address
+    const states = JSON.parse(localStorage.getItem('medichain_emergency_states') || '{}');
+    return !!states[patientAddress];
+  }
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    
+    // Check if contract exists on this network
+    const code = await provider.getCode(CONTRACT_ADDRESS);
+    if (code === '0x' || code === '0x0') {
+      throw new Error("Contract not deployed on this network");
+    }
+
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, provider);
+    return await contract.emergencyUnlock(patientAddress);
+  } catch (err) {
+    console.warn("Error checking emergency unlock on-chain, falling back to simulation:", err);
+    const states = JSON.parse(localStorage.getItem('medichain_emergency_states') || '{}');
+    return !!states[patientAddress];
+  }
+}
+
+/**
+ * Checks if a doctor has active access to a patient's data
+ */
+export async function checkHasAccess(patientAddress: string, doctorAddress: string): Promise<boolean> {
+  const isZeroAddress = patientAddress === '0x0000000000000000000000000000000000000000';
+  if (!window.ethereum || !ethers.isAddress(patientAddress) || !ethers.isAddress(doctorAddress) || isZeroAddress) {
+    // Fallback to simulation check
+    const grants = JSON.parse(localStorage.getItem('medichain_access_grants') || '[]');
+    return grants.some((g: any) => g.doctor === doctorAddress && g.active);
+  }
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+
+    // Check if contract exists on this network
+    const code = await provider.getCode(CONTRACT_ADDRESS);
+    if (code === '0x' || code === '0x0') {
+      throw new Error("Contract not deployed on this network");
+    }
+
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, provider);
+    return await contract.hasAccess(patientAddress, doctorAddress);
+  } catch (err) {
+    console.warn("Error checking access on-chain, falling back to simulation:", err);
+    const grants = JSON.parse(localStorage.getItem('medichain_access_grants') || '[]');
+    return grants.some((g: any) => g.doctor === doctorAddress && g.active);
+  }
+}
+
+/**
+ * Fetches all access grants for a patient
+ */
+export async function fetchAccessGrants(patientAddress: string) {
+  const simulatedGrants = JSON.parse(localStorage.getItem('medichain_access_grants') || '[]');
+  
+  if (!window.ethereum || !ethers.isAddress(patientAddress)) return simulatedGrants;
+
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      MediChainArtifact.abi,
+      provider
+    );
+
+    const doctors = await contract.getPatientDoctors(patientAddress);
+    const chainGrants = await Promise.all(doctors.map(async (doctor: string) => {
+      const grant = await contract.grants(patientAddress, doctor);
+      // grant is [doctor, modules[], expiry, active]
+      if (grant.active && Number(grant.expiry) > Math.floor(Date.now() / 1000)) {
+        return {
+          doctor: grant.doctor,
+          modules: grant.modules,
+          expiry: Number(grant.expiry),
+          active: grant.active,
+          isSimulated: false
+        };
+      }
+      return null;
+    }));
+
+    return [...simulatedGrants, ...chainGrants.filter(g => g !== null)];
+  } catch (err) {
+    console.error("Failed to fetch grants from blockchain:", err);
+    return simulatedGrants;
+  }
+}
+
+/**
+ * Simulates granting access
+ */
+export async function simulateGrantAccess(patientAddress: string, email: string, modules: string[], duration: number) {
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  const newGrant = {
+    doctor: email, // Using email as ID for simulation
+    modules,
+    expiry: Math.floor(Date.now() / 1000) + duration,
+    active: true,
+    isSimulated: true,
+    timestamp: Math.floor(Date.now() / 1000),
+    transactionHash: "0x" + Math.random().toString(16).slice(2, 10) + "..."
+  };
+
+  const saved = JSON.parse(localStorage.getItem('medichain_access_grants') || '[]');
+  saved.unshift(newGrant);
+  localStorage.setItem('medichain_access_grants', JSON.stringify(saved));
+
+  // Also add to audit log
+  const auditLog = JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]');
+  auditLog.unshift({
+    patientAddress: patientAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    ipfsHash: "ACCESS_GRANT",
+    recordType: `Access Granted: ${email}`,
+    timestamp: Math.floor(Date.now() / 1000),
+    uploader: patientAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    transactionHash: newGrant.transactionHash,
+    formattedDate: new Date().toLocaleString(),
+    isSimulated: true
+  });
+  localStorage.setItem('medichain_simulated_logs', JSON.stringify(auditLog));
+
+  return newGrant;
+}
+
+/**
+ * Simulates revoking access
+ */
+export async function simulateRevokeAccess(patientAddress: string, email: string) {
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  const saved = JSON.parse(localStorage.getItem('medichain_access_grants') || '[]');
+  const updated = saved.filter((g: any) => g.doctor !== email);
+  localStorage.setItem('medichain_access_grants', JSON.stringify(updated));
+
+  // Add to audit log
+  const auditLog = JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]');
+  auditLog.unshift({
+    patientAddress: patientAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    ipfsHash: "ACCESS_REVOKE",
+    recordType: `Access Revoked: ${email}`,
+    timestamp: Math.floor(Date.now() / 1000),
+    uploader: patientAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    transactionHash: "0x" + Math.random().toString(16).slice(2, 10) + "...",
+    formattedDate: new Date().toLocaleString(),
+    isSimulated: true
+  });
+  localStorage.setItem('medichain_simulated_logs', JSON.stringify(auditLog));
+}
+
+/**
+ * Simulates toggling emergency unlock
+ */
+export async function simulateToggleEmergencyUnlock(patientAddress: string, status: boolean) {
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  const txHash = "0x" + Math.random().toString(16).slice(2, 10) + "...";
+  
+  const auditLog = JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]');
+  auditLog.unshift({
+    patientAddress,
+    ipfsHash: "EMERGENCY_TOGGLE",
+    recordType: `Emergency Unlock: ${status ? 'ENABLED' : 'DISABLED'}`,
+    timestamp: Math.floor(Date.now() / 1000),
+    uploader: patientAddress,
+    transactionHash: txHash,
+    formattedDate: new Date().toLocaleString(),
+    isSimulated: true
+  });
+  localStorage.setItem('medichain_simulated_logs', JSON.stringify(auditLog));
+  
+  // Store state
+  const states = JSON.parse(localStorage.getItem('medichain_emergency_states') || '{}');
+  states[patientAddress] = status;
+  localStorage.setItem('medichain_emergency_states', JSON.stringify(states));
+}
+
+/**
+ * Simulates granting emergency access
+ */
+export async function simulateGrantEmergencyAccess(patientAddress: string, doctorAddress: string, reason: string) {
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  const txHash = "0x" + Math.random().toString(16).slice(2, 10) + "...";
+  
+  const auditLog = JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]');
+  auditLog.unshift({
+    patientAddress,
+    ipfsHash: "EMERGENCY_GRANT",
+    recordType: `Emergency Access: ${doctorAddress || 'Unknown Doctor'} (Reason: ${reason})`,
+    timestamp: Math.floor(Date.now() / 1000),
+    uploader: doctorAddress || 'Unknown Doctor',
+    transactionHash: txHash,
+    formattedDate: new Date().toLocaleString(),
+    isSimulated: true
+  });
+  localStorage.setItem('medichain_simulated_logs', JSON.stringify(auditLog));
+
+  // Store access grant in simulation
+  const grants = JSON.parse(localStorage.getItem('medichain_access_grants') || '[]');
+  grants.unshift({
+    doctor: doctorAddress,
+    patient: patientAddress,
+    modules: ['ALL'],
+    expiry: Math.floor(Date.now() / 1000) + 86400,
+    active: true,
+    isSimulated: true
+  });
+  localStorage.setItem('medichain_access_grants', JSON.stringify(grants));
 }
