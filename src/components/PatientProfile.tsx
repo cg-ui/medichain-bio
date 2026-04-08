@@ -1,9 +1,10 @@
-import React from 'react';
-import { ShieldCheck, Watch, Smartphone, RefreshCw, Plus, Lock, Info, Clock, CheckCircle2, Activity } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, Watch, Smartphone, RefreshCw, Plus, Lock, Info, Clock, CheckCircle2, Activity, Edit3 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { EditProfileModal } from './EditProfileModal';
 
-const timeline = [
+const initialTimeline = [
   {
     date: 'OCT 24, 2023 • DIAGNOSIS',
     ref: 'Ref: #TX-4491-B',
@@ -33,11 +34,38 @@ const timeline = [
 ];
 
 export function PatientProfile() {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [profile, setProfile] = useState({
+    name: 'Sarah Mitchell',
+    age: '32 Years',
+    bloodGroup: 'A Positive',
+    dob: 'May 14, 1991'
+  });
+  const [timeline, setTimeline] = useState(initialTimeline);
+
+  // Listen for timeline updates from the FAB
+  React.useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail) {
+        setTimeline(prev => [e.detail, ...prev]);
+      }
+    };
+    window.addEventListener('medical-history-update', handleUpdate);
+    return () => window.removeEventListener('medical-history-update', handleUpdate);
+  }, []);
+
   return (
     <div className="p-8 max-w-[1600px] mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-8">
         {/* Header Card */}
         <div className="bg-surface-container-lowest p-10 rounded-[3rem] shadow-sm border border-outline-variant/10 relative overflow-hidden">
+          <button 
+            onClick={() => setIsEditModalOpen(true)}
+            className="absolute top-8 right-8 p-3 rounded-2xl bg-surface-container-low text-outline hover:text-primary transition-all shadow-sm"
+          >
+            <Edit3 className="w-5 h-5" />
+          </button>
+          
           <div className="flex flex-col md:flex-row items-center gap-10">
             <div className="relative">
               <div className="w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
@@ -56,7 +84,7 @@ export function PatientProfile() {
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Patient Record #MC-99201</p>
-                  <h2 className="text-5xl font-headline font-extrabold text-on-surface tracking-tighter">Sarah Mitchell</h2>
+                  <h2 className="text-5xl font-headline font-extrabold text-on-surface tracking-tighter">{profile.name}</h2>
                 </div>
                 <div className="mt-4 md:mt-0 text-right">
                   <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Digital Signature Status</p>
@@ -65,19 +93,19 @@ export function PatientProfile() {
                   </span>
                 </div>
               </div>
-
+ 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-surface-container-low p-4 rounded-2xl">
                   <p className="text-[10px] font-bold text-outline uppercase mb-1">Blood Group</p>
-                  <p className="text-xl font-bold text-red-600">A Positive</p>
+                  <p className="text-xl font-bold text-red-600">{profile.bloodGroup}</p>
                 </div>
                 <div className="bg-surface-container-low p-4 rounded-2xl">
                   <p className="text-[10px] font-bold text-outline uppercase mb-1">Age</p>
-                  <p className="text-xl font-bold text-on-surface">32 Years</p>
+                  <p className="text-xl font-bold text-on-surface">{profile.age}</p>
                 </div>
                 <div className="bg-surface-container-low p-4 rounded-2xl">
                   <p className="text-[10px] font-bold text-outline uppercase mb-1">Date of Birth</p>
-                  <p className="text-xl font-bold text-on-surface">May 14, 1991</p>
+                  <p className="text-xl font-bold text-on-surface">{profile.dob}</p>
                 </div>
                 <div className="bg-surface-container-low p-4 rounded-2xl">
                   <p className="text-[10px] font-bold text-outline uppercase mb-1">Last Sync</p>
@@ -247,6 +275,13 @@ export function PatientProfile() {
           </button>
         </div>
       </div>
+      
+      <EditProfileModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        user={profile}
+        onSave={(updated) => setProfile(updated)}
+      />
     </div>
   );
 }

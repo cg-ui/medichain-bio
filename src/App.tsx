@@ -18,9 +18,11 @@ import { Reports } from './components/Reports';
 import { Blockchain } from './components/Blockchain';
 import { AuthPage } from './components/AuthPage';
 import { UploadModal } from './components/UploadModal';
-import { Activity, Droplets, Thermometer, Plus, LogOut } from 'lucide-react';
-import { motion } from 'motion/react';
+import { MedicalUpdateModal } from './components/MedicalUpdateModal';
+import { Activity, Droplets, Thermometer, Plus, LogOut, Stethoscope, Syringe, ClipboardList, Upload as UploadIcon } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useEffect } from 'react';
+import { cn } from '@/src/lib/utils';
 
 const heartRateData = [
   { value: 60 }, { value: 55 }, { value: 65 }, { value: 70 }, 
@@ -44,6 +46,8 @@ export default function App() {
   const [isDemo, setIsDemo] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
+  const [isFABMenuOpen, setIsFABMenuOpen] = useState(false);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -224,14 +228,53 @@ export default function App() {
           user={user}
         />
 
+        <MedicalUpdateModal
+          isOpen={isMedicalModalOpen}
+          onClose={() => setIsMedicalModalOpen(false)}
+          user={user}
+          onUpdate={(newEntry) => {
+            window.dispatchEvent(new CustomEvent('medical-history-update', { detail: newEntry }));
+          }}
+        />
+
         {/* Contextual FAB */}
-        <motion.button 
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-secondary text-white shadow-xl shadow-secondary/30 flex items-center justify-center z-50"
-        >
-          <Plus className="w-8 h-8" />
-        </motion.button>
+        <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-4">
+          <AnimatePresence>
+            {isFABMenuOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.8 }}
+                className="flex flex-col gap-3 mb-2"
+              >
+                {[
+                  { icon: UploadIcon, label: 'Upload Report', onClick: () => { setIsUploadModalOpen(true); setIsFABMenuOpen(false); } },
+                  { icon: Stethoscope, label: 'Add Diagnosis', onClick: () => { setIsMedicalModalOpen(true); setIsFABMenuOpen(false); } },
+                  { icon: Syringe, label: 'Add Vaccination', onClick: () => { setIsMedicalModalOpen(true); setIsFABMenuOpen(false); } },
+                  { icon: ClipboardList, label: 'Add Checkup', onClick: () => { setIsMedicalModalOpen(true); setIsFABMenuOpen(false); } },
+                ].map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={item.onClick}
+                    className="flex items-center gap-3 px-4 py-2 bg-surface-container-highest text-on-surface rounded-xl shadow-lg border border-outline-variant/20 hover:bg-primary hover:text-white transition-all group"
+                  >
+                    <span className="text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">{item.label}</span>
+                    <item.icon className="w-5 h-5" />
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setIsFABMenuOpen(!isFABMenuOpen)}
+            className="w-16 h-16 rounded-full bg-secondary text-white shadow-xl shadow-secondary/30 flex items-center justify-center"
+          >
+            <Plus className={cn("w-8 h-8 transition-transform duration-300", isFABMenuOpen && "rotate-45")} />
+          </motion.button>
+        </div>
       </main>
     </div>
   );
