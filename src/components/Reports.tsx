@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2, RefreshCw } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -20,28 +20,29 @@ export function Reports() {
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadLogs = async () => {
-      try {
-        setLoadingLogs(true);
-        // In a real app, we'd pass the current patient's address
-        const logs = await fetchAuditLog();
-        setBlockchainLogs(logs);
-      } catch (err: any) {
-        console.error("Failed to fetch blockchain logs:", err);
-        setError(err.message || "Failed to connect to blockchain");
-        // Fallback to mock data for demo if blockchain fails
-        setBlockchainLogs([
-          { formattedDate: '12 Oct 2023 14:32', recordType: 'Lab Result Synced (Mock)', transactionHash: '0x7a...4e21' },
-          { formattedDate: '12 Oct 2023 11:05', recordType: 'Access Granted: Dr. Sarah W. (Mock)', transactionHash: '0xb1...88c4' },
-        ]);
-      } finally {
-        setLoadingLogs(false);
-      }
-    };
-
-    loadLogs();
+  const loadLogs = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setLoadingLogs(true);
+      // In a real app, we'd pass the current patient's address
+      const logs = await fetchAuditLog();
+      setBlockchainLogs(logs);
+      setError(null);
+    } catch (err: any) {
+      console.error("Failed to fetch blockchain logs:", err);
+      setError(err.message || "Failed to connect to blockchain");
+      // Fallback logic...
+    } finally {
+      setLoadingLogs(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadLogs();
+    
+    const handleRefresh = () => loadLogs(false);
+    window.addEventListener('blockchain-update', handleRefresh);
+    return () => window.removeEventListener('blockchain-update', handleRefresh);
+  }, [loadLogs]);
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto w-full space-y-8">
@@ -211,9 +212,18 @@ export function Reports() {
 
       {/* Immutable Audit Log */}
       <div className="bg-surface-container-low/50 p-8 rounded-[2.5rem] border border-outline-variant/10">
-        <div className="flex items-center gap-2 mb-8">
-          <ShieldCheck className="w-5 h-5 text-primary" />
-          <h3 className="text-xl font-headline font-bold text-on-surface">Immutable Audit Log</h3>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-primary" />
+            <h3 className="text-xl font-headline font-bold text-on-surface">Immutable Audit Log</h3>
+          </div>
+          <button 
+            onClick={() => loadLogs()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-low text-outline hover:text-on-surface transition-all"
+          >
+            <RefreshCw className={cn("w-4 h-4", loadingLogs && "animate-spin")} />
+            <span className="text-xs font-bold">Refresh Log</span>
+          </button>
         </div>
         <div className="space-y-4">
           {loadingLogs ? (
@@ -234,6 +244,9 @@ export function Reports() {
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-teal-500" />
                       <p className="text-sm font-bold text-on-surface">{log.recordType}</p>
+                      {log.isSimulated && (
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-tighter">Simulated</span>
+                      )}
                     </div>
                   </div>
                   <div>

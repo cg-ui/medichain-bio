@@ -101,6 +101,16 @@ export default function App() {
   }
 
   const renderContent = () => {
+    // Role-based access control
+    if (activeTab === 'patient-profile' && user?.role === 'doctor') {
+      setActiveTab('dashboard');
+      return null;
+    }
+    if (activeTab === 'patients' && user?.role === 'patient') {
+      setActiveTab('dashboard');
+      return null;
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return (
@@ -147,7 +157,11 @@ export default function App() {
               <ActivityFeed />
               
               <div className="space-y-6">
-                <QuickActions />
+                <QuickActions 
+                  onUploadClick={() => setIsUploadModalOpen(true)}
+                  onGrantAccessClick={() => setActiveTab('access-control')}
+                  onEmergencyClick={() => setActiveTab('emergency')}
+                />
                 <TrustScoreCard />
               </div>
             </div>
@@ -181,6 +195,7 @@ export default function App() {
         onTabChange={setActiveTab} 
         onLogout={handleLogout} 
         onUploadClick={() => setIsUploadModalOpen(true)}
+        user={user}
       />
       
       <main className="ml-64 flex-1 min-h-screen flex flex-col">

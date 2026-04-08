@@ -30,9 +30,16 @@ interface SidebarProps {
   onTabChange: (id: string) => void;
   onLogout?: () => void;
   onUploadClick?: () => void;
+  user?: any;
 }
 
-export function Sidebar({ activeTab, onTabChange, onLogout, onUploadClick }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onLogout, onUploadClick, user }: SidebarProps) {
+  const filteredNavItems = navItems.filter(item => {
+    if (item.id === 'patient-profile' && user?.role === 'doctor') return false;
+    if (item.id === 'patients' && user?.role === 'patient') return false;
+    return true;
+  });
+
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-surface border-r-0 flex flex-col p-4 gap-2 z-50">
       <div className="flex items-center gap-3 px-3 py-6 mb-4">
@@ -46,7 +53,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout, onUploadClick }: Sid
       </div>
 
       <nav className="flex-1 flex flex-col gap-1">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onTabChange(item.id)}

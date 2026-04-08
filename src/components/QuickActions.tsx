@@ -2,7 +2,13 @@ import React from 'react';
 import { Upload, UserPlus, Share2, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export function QuickActions() {
+interface QuickActionsProps {
+  onUploadClick?: () => void;
+  onGrantAccessClick?: () => void;
+  onEmergencyClick?: () => void;
+}
+
+export function QuickActions({ onUploadClick, onGrantAccessClick, onEmergencyClick }: QuickActionsProps) {
   return (
     <div className="space-y-6">
       <h3 className="text-xl font-headline font-bold text-on-surface">Quick Actions</h3>
@@ -10,7 +16,8 @@ export function QuickActions() {
         <motion.button 
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="flex items-center justify-between p-4 rounded-2xl bg-primary text-white hover:shadow-xl hover:shadow-primary/20 transition-all"
+          onClick={onUploadClick}
+          className="flex items-center justify-between p-4 rounded-2xl bg-primary text-white hover:shadow-xl hover:shadow-primary/20 transition-all w-full"
         >
           <div className="flex items-center gap-4">
             <Upload className="w-6 h-6" />
@@ -25,7 +32,8 @@ export function QuickActions() {
         <motion.button 
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-high text-on-surface hover:bg-surface-variant transition-all"
+          onClick={onGrantAccessClick}
+          className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-high text-on-surface hover:bg-surface-variant transition-all w-full"
         >
           <div className="flex items-center gap-4">
             <UserPlus className="w-6 h-6 text-primary" />
@@ -40,7 +48,8 @@ export function QuickActions() {
         <motion.button 
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="flex items-center justify-between p-4 rounded-2xl bg-error-container text-on-error-container hover:shadow-lg hover:shadow-error/10 transition-all"
+          onClick={onEmergencyClick}
+          className="flex items-center justify-between p-4 rounded-2xl bg-error-container text-on-error-container hover:shadow-lg hover:shadow-error/10 transition-all w-full"
         >
           <div className="flex items-center gap-4">
             <Share2 className="w-6 h-6 text-red-600 fill-red-600/20" />

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { X, Upload, FileText, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { uploadToIPFS, addRecordOnChain } from '../services/blockchainService';
+import { cn } from '@/src/lib/utils';
+import { uploadToIPFS, addRecordOnChain, simulateRecordOnChain, ensureSepoliaNetwork } from '../services/blockchainService';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -11,8 +12,9 @@ interface UploadModalProps {
 
 export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [patientAddress, setPatientAddress] = useState('');
+  const [patientAddress, setPatientAddress] = useState(user?.role === 'patient' ? user?.walletAddress || '' : '');
   const [recordType, setRecordType] = useState('PDF');
+  const [isSimulation, setIsSimulation] = useState(true);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'recording' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
   const [txHash, setTxHash] = useState('');
@@ -38,14 +40,44 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
       
       setStatus('recording');
       
-      // 2. Record on Blockchain
-      const receipt = await addRecordOnChain(patientAddress, ipfsHash, recordType);
+      // 2. Record on Blockchain (Real or Simulated)
+      let receipt;
+      if (isSimulation) {
+        receipt = await simulateRecordOnChain(patientAddress, ipfsHash, recordType);
+      } else {
+        // Ensure we are on Sepolia before trying to send a real transaction
+        await ensureSepoliaNetwork();
+        receipt = await addRecordOnChain(patientAddress, ipfsHash, recordType);
+        
+        // Also save to local storage so it shows up in the UI immediately
+        const newLog = {
+          patientAddress,
+          ipfsHash,
+          recordType,
+          timestamp: Math.floor(Date.now() / 1000),
+          uploader: user?.walletAddress || "0xCurrent",
+          transactionHash: receipt.hash,
+          formattedDate: new Date().toLocaleString(),
+          isSimulated: false,
+          isPendingSync: true // Mark as pending until next blockchain sync
+        };
+        const saved = JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]');
+        saved.unshift(newLog);
+        localStorage.setItem('medichain_simulated_logs', JSON.stringify(saved.slice(0, 50)));
+      }
       
       setTxHash(receipt.hash);
       setStatus('success');
+      window.dispatchEvent(new CustomEvent('blockchain-update'));
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "An error occurred during upload.");
+      let msg = err.message || "An error occurred during upload.";
+      if (msg.includes("insufficient funds")) {
+        msg = "Insufficient Sepolia ETH. Please get free test ETH from a faucet (e.g., sepoliafaucet.com) or use 'Simulation Mode'.";
+      } else if (msg.includes("user rejected") || err.code === "ACTION_REJECTED" || err.code === 4001) {
+        msg = "Transaction was canceled. You can use 'Simulation Mode' to test without signing.";
+      }
+      setError(msg);
       setStatus('error');
     }
   };
@@ -152,6 +184,30 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
                       </div>
                     )}
                   </label>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                      <ShieldAlert className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-on-surface">Simulation Mode</p>
+                      <p className="text-[10px] text-outline">Free demo on Sanctuary Network</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsSimulation(!isSimulation)}
+                    className={cn(
+                      "w-12 h-6 rounded-full transition-all relative",
+                      isSimulation ? "bg-primary" : "bg-outline-variant"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                      isSimulation ? "right-1" : "left-1"
+                    )} />
+                  </button>
                 </div>
 
                 {error && (

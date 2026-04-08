@@ -8,7 +8,87 @@ declare global {
 }
 
 // Replace with your deployed contract address
-const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; 
+const CONTRACT_ADDRESS = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"; 
+
+const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111
+
+/**
+ * Ensures the user is connected to the Sepolia network
+ */
+export async function ensureSepoliaNetwork() {
+  if (!window.ethereum) throw new Error("MetaMask is not installed");
+
+  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+  
+  if (chainId !== SEPOLIA_CHAIN_ID) {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: SEPOLIA_CHAIN_ID }],
+      });
+    } catch (switchError: any) {
+      // This error code indicates that the chain has not been added to MetaMask.
+      if (switchError.code === 4902) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [
+            {
+              chainId: SEPOLIA_CHAIN_ID,
+              chainName: 'Sepolia Test Network',
+              nativeCurrency: {
+                name: 'Sepolia ETH',
+                symbol: 'ETH',
+                decimals: 18,
+              },
+              rpcUrls: ['https://rpc.sepolia.org'],
+              blockExplorerUrls: ['https://sepolia.etherscan.io'],
+            },
+          ],
+        });
+      } else {
+        throw switchError;
+      }
+    }
+  }
+}
+
+// In-memory storage for simulated logs (persists during session)
+const simulatedLogs: any[] = [];
+
+/**
+ * Simulates a blockchain transaction for demo purposes
+ */
+export async function simulateRecordOnChain(
+  patientAddress: string,
+  ipfsHash: string,
+  recordType: string
+) {
+  // Artificial delay to mimic blockchain processing
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  const txHash = "0x" + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  const timestamp = Math.floor(Date.now() / 1000);
+  
+  const newLog = {
+    patientAddress,
+    ipfsHash,
+    recordType,
+    timestamp,
+    uploader: "0xDemoUserAddress",
+    transactionHash: txHash,
+    formattedDate: new Date(timestamp * 1000).toLocaleString(),
+    isSimulated: true
+  };
+  
+  simulatedLogs.unshift(newLog);
+  
+  // Also save to localStorage for persistence across reloads in demo
+  const saved = JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]');
+  saved.unshift(newLog);
+  localStorage.setItem('medichain_simulated_logs', JSON.stringify(saved.slice(0, 50)));
+
+  return { hash: txHash };
+}
 
 /**
  * Conceptual function for uploading to IPFS via Pinata
@@ -63,42 +143,49 @@ export async function addRecordOnChain(
   const tx = await contract.addMedicalRecord(patientAddress, ipfsHash, recordType);
   const receipt = await tx.wait();
   
-  console.log("Transaction confirmed:", receipt.hash);
-  return receipt;
+  const hash = receipt.hash || receipt.transactionHash;
+  console.log("Transaction confirmed:", hash);
+  return { ...receipt, hash };
 }
 
 /**
  * Fetches the audit log by querying MedicalRecordAdded events
  */
 export async function fetchAuditLog(patientAddress?: string) {
-  if (!window.ethereum) throw new Error("MetaMask is not installed");
+  const allLogs = [...JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]')];
 
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const contract = new ethers.Contract(
-    CONTRACT_ADDRESS,
-    MediChainArtifact.abi,
-    provider
-  );
+  if (!window.ethereum) {
+    console.warn("MetaMask not detected, returning simulated logs only.");
+    return allLogs;
+  }
 
-  // Create filter for the MedicalRecordAdded event
-  // If patientAddress is provided, filter by it (it's indexed in the contract)
-  const filter = contract.filters.MedicalRecordAdded(patientAddress);
-  
-  // Query events from the last 10,000 blocks (or from deployment)
-  const events = await contract.queryFilter(filter, -10000);
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      MediChainArtifact.abi,
+      provider
+    );
 
-  return events.map(event => {
-    // Ethers v6 event parsing
-    const { patientAddress, ipfsHash, recordType, timestamp, uploader } = (event as any).args;
-    
-    return {
-      patientAddress,
-      ipfsHash,
-      recordType,
-      timestamp: Number(timestamp),
-      uploader,
-      transactionHash: event.transactionHash,
-      formattedDate: new Date(Number(timestamp) * 1000).toLocaleString()
-    };
-  }).reverse(); // Newest first
+    const filter = contract.filters.MedicalRecordAdded(patientAddress);
+    const events = await contract.queryFilter(filter, -10000); // Increased range to 10k blocks
+
+    const chainLogs = events.map(event => {
+      const { patientAddress, ipfsHash, recordType, timestamp, uploader } = (event as any).args;
+      return {
+        patientAddress,
+        ipfsHash,
+        recordType,
+        timestamp: Number(timestamp),
+        uploader,
+        transactionHash: event.transactionHash,
+        formattedDate: new Date(Number(timestamp) * 1000).toLocaleString()
+      };
+    });
+
+    return [...allLogs, ...chainLogs].sort((a, b) => b.timestamp - a.timestamp);
+  } catch (err) {
+    console.error("Failed to fetch from blockchain, returning simulated logs:", err);
+    return allLogs;
+  }
 }
