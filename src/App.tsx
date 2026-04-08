@@ -19,7 +19,8 @@ import { Blockchain } from './components/Blockchain';
 import { AuthPage } from './components/AuthPage';
 import { UploadModal } from './components/UploadModal';
 import { MedicalUpdateModal } from './components/MedicalUpdateModal';
-import { Activity, Droplets, Thermometer, Plus, LogOut, Stethoscope, Syringe, ClipboardList, Upload as UploadIcon } from 'lucide-react';
+import { VitalsProvider, useVitals } from './context/VitalsContext';
+import { Activity, Droplets, Thermometer, Plus, LogOut, Stethoscope, Syringe, ClipboardList, Upload as UploadIcon, BrainCircuit, AlertTriangle, Info as InfoIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useEffect } from 'react';
 import { cn } from '@/src/lib/utils';
@@ -40,6 +41,14 @@ const tempData = [
 ];
 
 export default function App() {
+  return (
+    <VitalsProvider>
+      <AppContent />
+    </VitalsProvider>
+  );
+}
+
+function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -48,6 +57,7 @@ export default function App() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isFABMenuOpen, setIsFABMenuOpen] = useState(false);
+  const { heartRate, spo2, temp, aiSignals } = useVitals();
 
   useEffect(() => {
     if (isDarkMode) {
@@ -129,32 +139,70 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <MetricCard 
                 icon={Activity}
-                label="Heart Rate"
-                value="72"
-                unit="bpm"
-                status="NORMAL"
+                label={heartRate.label}
+                value={heartRate.value.toString()}
+                unit={heartRate.unit}
+                status={heartRate.status}
                 colorClass="text-primary"
-                data={heartRateData}
+                data={heartRate.history}
               />
               <MetricCard 
                 icon={Droplets}
-                label="SpO₂ Level"
-                value="98"
-                unit="%"
-                status="NORMAL"
+                label={spo2.label}
+                value={spo2.value.toString()}
+                unit={spo2.unit}
+                status={spo2.status}
                 colorClass="text-secondary"
-                data={spo2Data}
+                data={spo2.history}
               />
               <MetricCard 
                 icon={Thermometer}
-                label="Body Temp"
-                value="98.6"
-                unit="°F"
-                status="STABLE"
+                label={temp.label}
+                value={temp.value.toString()}
+                unit={temp.unit}
+                status={temp.status}
                 colorClass="text-tertiary"
-                data={tempData}
+                data={temp.history}
               />
             </div>
+
+            {/* AI Diagnostic Signals */}
+            <section className="mb-8">
+              <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-primary/20 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-6 opacity-5">
+                  <BrainCircuit className="w-24 h-24 text-primary" />
+                </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <BrainCircuit className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-headline font-bold text-on-surface">Diagnostic AI Signals</h3>
+                </div>
+                <div className="space-y-3 relative z-10">
+                  {aiSignals.map((signal, idx) => (
+                    <motion.div 
+                      key={idx}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={cn(
+                        "flex items-center justify-between p-4 rounded-2xl border",
+                        signal.type === 'critical' ? "bg-red-50 border-red-200 text-red-700" :
+                        signal.type === 'warning' ? "bg-amber-50 border-amber-200 text-amber-700" :
+                        "bg-blue-50 border-blue-200 text-blue-700"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        {signal.type === 'critical' ? <AlertTriangle className="w-5 h-5" /> : 
+                         signal.type === 'warning' ? <AlertTriangle className="w-5 h-5" /> : 
+                         <InfoIcon className="w-5 h-5" />}
+                        <span className="text-sm font-bold">{signal.message}</span>
+                      </div>
+                      <span className="text-[10px] font-mono opacity-60">{signal.timestamp}</span>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </section>
 
             {/* Lower Section: Logs & Quick Actions */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

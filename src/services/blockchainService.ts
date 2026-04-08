@@ -87,7 +87,7 @@ export async function simulateRecordOnChain(
   saved.unshift(newLog);
   localStorage.setItem('medichain_simulated_logs', JSON.stringify(saved.slice(0, 50)));
 
-  return { hash: txHash };
+  return { hash: txHash, ipfsHash };
 }
 
 /**
@@ -96,27 +96,72 @@ export async function simulateRecordOnChain(
  * @returns The IPFS CID (Hash)
  */
 export async function uploadToIPFS(file: File): Promise<string> {
-  console.log("Uploading file to IPFS:", file.name);
+  console.log("Uploading file to IPFS via Pinata:", file.name);
   
-  // In a real production app, you would use the Pinata SDK or API
-  // Example using Pinata API:
-  /*
-  const formData = new FormData();
-  formData.append('file', file);
+  const jwt = import.meta.env.VITE_PINATA_JWT;
+  
+  if (!jwt) {
+    console.warn("Pinata JWT not found in environment. Falling back to simulation CID.");
+    // Fallback to a real sample CID if no API key is provided yet
+    return "QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K";
+  }
 
-  const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`
-    },
-    body: formData
-  });
-  const data = await res.json();
-  return data.IpfsHash;
-  */
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
 
-  // Mocking the IPFS hash for demonstration
-  return "QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco";
+    const metadata = JSON.stringify({
+      name: file.name,
+      keyvalues: {
+        app: 'MediChain',
+        uploadedAt: new Date().toISOString()
+      }
+    });
+    formData.append('pinataMetadata', metadata);
+
+    const options = JSON.stringify({
+      cidVersion: 1,
+    });
+    formData.append('pinataOptions', options);
+
+    const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jwt}`
+      },
+      body: formData
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(`Pinata upload failed: ${errorData.error?.details || res.statusText}`);
+    }
+
+    const data = await res.json();
+    console.log("File pinned successfully:", data.IpfsHash);
+    return data.IpfsHash;
+  } catch (error) {
+    console.error("Error uploading to Pinata:", error);
+    throw error;
+  }
+}
+
+/**
+ * Returns a gateway link for an IPFS CID
+ */
+export function getIPFSLink(cid: string) {
+  // If CID is missing or invalid, use a sample CID for the demo to prevent broken redirects
+  const effectiveCid = (!cid || cid.startsWith('0x')) 
+    ? "QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K" 
+    : cid;
+  
+  // Use dedicated gateway if provided, otherwise fallback to ipfs.io
+  // ipfs.io is the most permissive public gateway for viewing various content types
+  const gateway = import.meta.env.VITE_PINATA_GATEWAY_URL || 'https://ipfs.io';
+  
+  // Ensure no trailing slash in gateway URL
+  const base = gateway.endsWith('/') ? gateway.slice(0, -1) : gateway;
+  return `${base}/ipfs/${effectiveCid}`;
 }
 
 /**
@@ -145,7 +190,7 @@ export async function addRecordOnChain(
   
   const hash = receipt.hash || receipt.transactionHash;
   console.log("Transaction confirmed:", hash);
-  return { ...receipt, hash };
+  return { ...receipt, hash, ipfsHash };
 }
 
 /**

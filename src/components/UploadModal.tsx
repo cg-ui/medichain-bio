@@ -68,7 +68,13 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
       
       setTxHash(receipt.hash);
       setStatus('success');
-      window.dispatchEvent(new CustomEvent('blockchain-update'));
+      window.dispatchEvent(new CustomEvent('blockchain-update', { 
+        detail: { 
+          hash: receipt.hash, 
+          ipfsHash: receipt.ipfsHash,
+          recordType 
+        } 
+      }));
     } catch (err: any) {
       console.error(err);
       let msg = err.message || "An error occurred during upload.";

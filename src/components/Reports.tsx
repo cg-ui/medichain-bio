@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2, RefreshCw } from 'lucide-react';
+import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2, RefreshCw, BrainCircuit, AlertTriangle, Info as InfoIcon, Copy, Check } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { fetchAuditLog } from '../services/blockchainService';
+import { useVitals } from '../context/VitalsContext';
 
 const weeklyHeartRate = [
   { day: 'MON', value: 65, type: 'resting' },
@@ -19,6 +20,14 @@ export function Reports() {
   const [blockchainLogs, setBlockchainLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { heartRate, spo2, temp, aiSignals } = useVitals();
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const loadLogs = useCallback(async (showLoading = true) => {
     try {
@@ -70,11 +79,16 @@ export function Reports() {
         <div className="lg:col-span-2 bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-sm border border-outline-variant/10">
           <div className="flex justify-between items-start mb-8">
             <div>
-              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Heart Rate</p>
+              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{heartRate.label}</p>
               <div className="flex items-baseline gap-2">
-                <h2 className="text-4xl font-headline font-extrabold text-on-surface">72</h2>
-                <span className="text-xs font-bold text-outline">bpm</span>
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-bold">Stable</span>
+                <h2 className="text-4xl font-headline font-extrabold text-on-surface">{heartRate.value}</h2>
+                <span className="text-xs font-bold text-outline">{heartRate.unit}</span>
+                <span className={cn(
+                  "ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold",
+                  heartRate.status === 'NORMAL' ? "bg-tertiary-fixed text-on-tertiary-fixed" : "bg-red-100 text-red-700"
+                )}>
+                  {heartRate.status}
+                </span>
               </div>
             </div>
             <div className="flex gap-4">
@@ -131,10 +145,13 @@ export function Reports() {
 
           <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-outline-variant/10 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">SpO₂ Level</p>
-              <h3 className="text-3xl font-headline font-extrabold text-on-surface">99%</h3>
+              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{spo2.label}</p>
+              <h3 className="text-3xl font-headline font-extrabold text-on-surface">{spo2.value}{spo2.unit}</h3>
             </div>
-            <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center",
+              spo2.status === 'NORMAL' ? "bg-secondary/10 text-secondary" : "bg-red-100 text-red-600"
+            )}>
               <Droplets className="w-6 h-6" />
             </div>
           </div>
@@ -144,15 +161,24 @@ export function Reports() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Temperature Card */}
         <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-sm border border-outline-variant/10 flex flex-col items-center justify-center text-center">
-          <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-4">Temperature</p>
+          <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-4">{temp.label}</p>
           <div className="relative w-40 h-40 flex items-center justify-center mb-4">
             <svg className="w-full h-full transform -rotate-90">
               <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-surface-container-low" />
-              <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={440} strokeDashoffset={440 * (1 - 0.75)} className="text-tertiary" strokeLinecap="round" />
+              <circle 
+                cx="80" cy="80" r="70" 
+                stroke="currentColor" 
+                strokeWidth="12" 
+                fill="transparent" 
+                strokeDasharray={440} 
+                strokeDashoffset={440 * (1 - (temp.value - 90) / 20)} 
+                className={temp.status === 'STABLE' ? "text-tertiary" : "text-red-500"} 
+                strokeLinecap="round" 
+              />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <Thermometer className="w-8 h-8 text-tertiary mb-1" />
-              <span className="text-2xl font-headline font-extrabold text-on-surface">98.6°F</span>
+              <Thermometer className={cn("w-8 h-8 mb-1", temp.status === 'STABLE' ? "text-tertiary" : "text-red-500")} />
+              <span className="text-2xl font-headline font-extrabold text-on-surface">{temp.value}{temp.unit}</span>
             </div>
           </div>
           <div className="flex gap-8 w-full">
@@ -175,37 +201,47 @@ export function Reports() {
           </div>
           
           <div className="space-y-4">
-            <div className="bg-surface-container-lowest p-6 rounded-3xl border-l-4 border-red-500 shadow-sm flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500">
-                <AlertCircle className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between mb-1">
-                  <h4 className="font-bold text-on-surface">Abnormal Tachycardia Detected</h4>
-                  <span className="text-[10px] font-bold text-outline">2 HOURS AGO</span>
+            {aiSignals.map((signal, idx) => (
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "p-6 rounded-3xl border-l-4 shadow-sm flex items-start gap-4",
+                  signal.type === 'critical' ? "bg-red-50 border-red-500" :
+                  signal.type === 'warning' ? "bg-amber-50 border-amber-500" :
+                  "bg-surface-container-lowest border-teal-500"
+                )}
+              >
+                <div className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center",
+                  signal.type === 'critical' ? "bg-red-100 text-red-500" :
+                  signal.type === 'warning' ? "bg-amber-100 text-amber-500" :
+                  "bg-teal-50 text-teal-500"
+                )}>
+                  {signal.type === 'critical' ? <AlertTriangle className="w-6 h-6" /> : 
+                   signal.type === 'warning' ? <AlertTriangle className="w-6 h-6" /> : 
+                   <BrainCircuit className="w-6 h-6" />}
                 </div>
-                <p className="text-xs text-on-surface-variant mb-4">Heart rate sustained 115bpm for 12 minutes during a restful state. This deviates from your historical baseline by +42%.</p>
-                <div className="flex gap-2">
-                  <span className="px-3 py-1 rounded-full bg-surface-container-low text-[10px] font-bold text-outline">Ref: Block #821,992</span>
-                  <button className="px-3 py-1 rounded-full bg-primary/10 text-[10px] font-bold text-primary hover:bg-primary/20 transition-all">Alert Provider</button>
-                  <button className="px-3 py-1 rounded-full bg-surface-container-low text-[10px] font-bold text-outline hover:bg-surface-container-high transition-all">Dismiss</button>
+                <div className="flex-1">
+                  <div className="flex justify-between mb-1">
+                    <h4 className="font-bold text-on-surface">{signal.message}</h4>
+                    <span className="text-[10px] font-bold text-outline">{signal.timestamp}</span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant mb-4">
+                    {signal.type === 'info' 
+                      ? "Real-time biometric analysis confirms all parameters are within safe clinical thresholds. Blockchain integrity verified."
+                      : "Automated analysis detected a deviation from your clinical baseline. This event has been logged to your immutable medical ledger."}
+                  </p>
+                  <div className="flex gap-2">
+                    <span className="px-3 py-1 rounded-full bg-surface-container-low text-[10px] font-bold text-outline">Ref: Live Stream</span>
+                    {signal.type !== 'info' && (
+                      <button className="px-3 py-1 rounded-full bg-primary/10 text-[10px] font-bold text-primary hover:bg-primary/20 transition-all">Alert Provider</button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-lowest p-6 rounded-3xl border-l-4 border-teal-500 shadow-sm flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-teal-500">
-                <Lightbulb className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between mb-1">
-                  <h4 className="font-bold text-on-surface">Sleep Pattern Optimization</h4>
-                  <span className="text-[10px] font-bold text-outline">YESTERDAY</span>
-                </div>
-                <p className="text-xs text-on-surface-variant mb-4">Consistency in REM cycles has improved by 14% this week. Maintain current bedtime for continued cognitive recovery scores.</p>
-                <button className="px-3 py-1 rounded-full bg-teal-500/10 text-[10px] font-bold text-teal-600 hover:bg-teal-500/20 transition-all">View Recommendations</button>
-              </div>
-            </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </div>
@@ -254,12 +290,22 @@ export function Reports() {
                     <p className="text-sm font-mono text-outline truncate max-w-[150px]">{log.transactionHash}</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => window.open(`https://sepolia.etherscan.io/tx/${log.transactionHash}`, '_blank')}
-                  className="p-2 rounded-xl hover:bg-surface-container-low text-outline group-hover:text-primary transition-all"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => copyToClipboard(log.ipfsHash, `ipfs-${idx}`)}
+                    title="Copy IPFS CID"
+                    className="p-2 rounded-xl hover:bg-surface-container-low text-outline hover:text-primary transition-all relative"
+                  >
+                    {copiedId === `ipfs-${idx}` ? <Check className="w-5 h-5 text-teal-500" /> : <Copy className="w-5 h-5" />}
+                  </button>
+                  <button 
+                    onClick={() => window.open(`https://sepolia.etherscan.io/tx/${log.transactionHash}`, '_blank')}
+                    title="View on Etherscan"
+                    className="p-2 rounded-xl hover:bg-surface-container-low text-outline hover:text-primary transition-all"
+                  >
+                    <ExternalLink className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             ))
           ) : (

@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, Key, FileText, Loader2, Database, RefreshCw } from 'lucide-react';
+import { Link, Key, Loader2, Database, RefreshCw, Copy, Check } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { fetchAuditLog } from '../services/blockchainService';
 
 export function ActivityFeed() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const loadActivities = useCallback(async (showLoading = true) => {
     try {
@@ -19,6 +26,7 @@ export function ActivityFeed() {
         title: `Blockchain Entry: ${log.recordType}`,
         time: log.formattedDate,
         description: `Transaction: ${log.transactionHash.slice(0, 10)}...${log.transactionHash.slice(-8)}`,
+        ipfsHash: log.ipfsHash,
         tag: log.isPendingSync ? 'SYNCING...' : 'VERIFIED IMMUTABLE',
         color: log.isPendingSync ? 'text-outline bg-surface-container-high' : 'text-primary bg-primary/5 hover:bg-primary',
         isSimulated: log.isSimulated
@@ -35,6 +43,7 @@ export function ActivityFeed() {
           title: 'Blockchain Entry: Lab Results Encrypted',
           time: '2m ago',
           description: 'Block #482,910 validated by Sanctuary Node 04. Hash: 0x8f2...e32a',
+          ipfsHash: 'QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K',
           tag: 'VERIFIED IMMUTABLE',
           color: 'text-primary bg-primary/5 hover:bg-primary'
         },
@@ -102,15 +111,27 @@ export function ActivityFeed() {
                   <span className="text-[11px] font-medium text-outline">{activity.time}</span>
                 </div>
                 <p className="text-sm text-on-surface-variant mb-2">{activity.description}</p>
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "text-[10px] px-2 py-0.5 rounded-full font-bold",
-                    activity.tagColor || "bg-surface-container-high text-outline-variant"
-                  )}>
-                    {activity.tag}
-                  </span>
-                  {activity.isSimulated && (
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-tighter">Simulated</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-[10px] px-2 py-0.5 rounded-full font-bold",
+                      activity.tagColor || "bg-surface-container-high text-outline-variant"
+                    )}>
+                      {activity.tag}
+                    </span>
+                    {activity.isSimulated && (
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-tighter">Simulated</span>
+                    )}
+                  </div>
+                  {activity.ipfsHash && (
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => copyToClipboard(activity.ipfsHash, `activity-${activity.id}`)}
+                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                      >
+                        {copiedId === `activity-${activity.id}` ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />} CID
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

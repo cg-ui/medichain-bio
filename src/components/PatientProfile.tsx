@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Watch, Smartphone, RefreshCw, Plus, Lock, Info, Clock, CheckCircle2, Activity, Edit3 } from 'lucide-react';
+import { ShieldCheck, Watch, Smartphone, RefreshCw, Plus, Lock, Info, Clock, CheckCircle2, Activity, Edit3, Copy, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { EditProfileModal } from './EditProfileModal';
@@ -11,6 +11,7 @@ const initialTimeline = [
     title: 'Acute Seasonal Allergy Response',
     description: 'Patient presented with severe respiratory irritation and dermal hives. Initial treatment via antihistamines administered by Dr. Aris Thorne.',
     hash: '0x8a2...3f1',
+    ipfsHash: 'QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K',
     color: 'border-blue-600',
     dot: 'bg-blue-600'
   },
@@ -20,6 +21,8 @@ const initialTimeline = [
     title: 'Influenza Type-A Annual Booster',
     description: 'Administered at Central Medical Facility. Lot number: L-88921. No adverse reactions observed during 30-minute post-injection monitoring.',
     tag: 'Verified by Clinic-09',
+    hash: '0x7b1...2e4',
+    ipfsHash: 'QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K',
     color: 'border-teal-600',
     dot: 'bg-teal-600'
   },
@@ -28,6 +31,8 @@ const initialTimeline = [
     ref: 'Ref: #RX-1102-K',
     title: 'Annual Physical & Bloodwork',
     description: 'All metrics within nominal range. LDL cholesterol slightly elevated, recommended dietary adjustments.',
+    hash: '0x3c2...1a9',
+    ipfsHash: 'QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K',
     color: 'border-slate-300',
     dot: 'bg-slate-300'
   }
@@ -42,6 +47,13 @@ export function PatientProfile() {
     dob: 'May 14, 1991'
   });
   const [timeline, setTimeline] = useState(initialTimeline);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Listen for timeline updates from the FAB
   React.useEffect(() => {
@@ -155,9 +167,21 @@ export function PatientProfile() {
                     ) : <div />}
                     
                     {item.hash && (
-                      <button className="text-primary text-[10px] font-bold flex items-center gap-1 hover:underline">
-                        <RefreshCw className="w-3 h-3" /> View Report
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={() => copyToClipboard(item.ipfsHash, `timeline-${idx}`)}
+                          title="Copy IPFS CID"
+                          className="text-primary text-[10px] font-bold flex items-center gap-1 hover:underline relative"
+                        >
+                          {copiedId === `timeline-${idx}` ? <Check className="w-3 h-3 text-teal-500" /> : <Copy className="w-3 h-3" />} Copy CID
+                        </button>
+                        <button 
+                          onClick={() => window.open(`https://sepolia.etherscan.io/tx/${item.hash}`, '_blank')}
+                          className="text-primary text-[10px] font-bold flex items-center gap-1 hover:underline"
+                        >
+                          <RefreshCw className="w-3 h-3" /> View on Etherscan
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

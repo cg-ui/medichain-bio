@@ -59,6 +59,7 @@ export function MedicalUpdateModal({ isOpen, onClose, user, onUpdate }: MedicalU
         title,
         description,
         hash: receipt.hash,
+        ipfsHash: receipt.ipfsHash,
         color: type === 'diagnosis' ? 'border-blue-600' : type === 'vaccination' ? 'border-teal-600' : 'border-slate-300',
         dot: type === 'diagnosis' ? 'bg-blue-600' : type === 'vaccination' ? 'bg-teal-600' : 'bg-slate-300',
         isSimulated: isSimulation
@@ -67,7 +68,13 @@ export function MedicalUpdateModal({ isOpen, onClose, user, onUpdate }: MedicalU
       setTxHash(receipt.hash);
       onUpdate(newEntry);
       setStatus('success');
-      window.dispatchEvent(new CustomEvent('blockchain-update'));
+      window.dispatchEvent(new CustomEvent('blockchain-update', { 
+        detail: { 
+          hash: receipt.hash, 
+          ipfsHash: receipt.ipfsHash,
+          recordType: type 
+        } 
+      }));
     } catch (err: any) {
       console.error(err);
       let msg = err.message || "An error occurred.";
