@@ -146,7 +146,11 @@ export function Emergency() {
       });
 
       if (unlocked || hasAccess) {
-        toast.success("Access verified! You can now view the patient's reports.");
+        toast.success("Access verified! Redirecting to patient reports...");
+        setTimeout(() => {
+          window.location.href = `/?tab=reports&patient=${address}`;
+        }, 1000);
+        return; // Stop here, don't load logs in this view since we are redirecting
       } else {
         toast.info("Patient has not enabled emergency unlock. You may request temporary access.");
       }
@@ -373,7 +377,7 @@ export function Emergency() {
 
                   {doctorAccessStatus.unlocked || doctorAccessStatus.hasAccess ? (
                     <button 
-                      onClick={() => window.location.href = `/reports?patient=${resolvedAddress}`}
+                      onClick={() => window.location.href = `/?tab=reports&patient=${resolvedAddress}`}
                       className="w-full py-4 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-2 hover:bg-primary-dark transition-all"
                     >
                       <ExternalLink className="w-4 h-4" />

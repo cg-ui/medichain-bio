@@ -18,7 +18,7 @@ export function useMetaMask() {
     error: null,
   });
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (forceSelect = false) => {
     if (!window.ethereum) {
       setState(prev => ({ ...prev, error: "MetaMask is not installed. Please install it to continue." }));
       return;
@@ -28,6 +28,15 @@ export function useMetaMask() {
       setState(prev => ({ ...prev, isConnecting: true, error: null }));
       
       const provider = new ethers.BrowserProvider(window.ethereum);
+      
+      if (forceSelect) {
+        // Force MetaMask to show the account selection dialog
+        await window.ethereum.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }],
+        });
+      }
+
       // Request account access
       const accounts = await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();

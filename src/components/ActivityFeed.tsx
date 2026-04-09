@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, Key, Loader2, Database, RefreshCw, Copy, Check } from 'lucide-react';
+import { Link, Key, Loader2, Database, RefreshCw, Copy, Check, ShieldCheck, UserPlus, Unlock, Lock } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { fetchAuditLog } from '../services/blockchainService';
 
@@ -20,17 +20,38 @@ export function ActivityFeed() {
       const logs = await fetchAuditLog();
       
       // Map blockchain logs to activity format
-      const mappedActivities = logs.slice(0, 5).map((log, index) => ({
-        id: index,
-        icon: Database,
-        title: `Blockchain Entry: ${log.recordType}`,
-        time: log.formattedDate,
-        description: `Transaction: ${log.transactionHash.slice(0, 10)}...${log.transactionHash.slice(-8)}`,
-        ipfsHash: log.ipfsHash,
-        tag: log.isPendingSync ? 'SYNCING...' : 'VERIFIED IMMUTABLE',
-        color: log.isPendingSync ? 'text-outline bg-surface-container-high' : 'text-primary bg-primary/5 hover:bg-primary',
-        isSimulated: log.isSimulated
-      }));
+      const mappedActivities = logs.slice(0, 8).map((log, index) => {
+        let icon = Database;
+        let color = 'text-primary bg-primary/5 hover:bg-primary';
+        let tagColor = "bg-surface-container-high text-outline-variant";
+
+        if (log.ipfsHash === "LOGIN_EVENT") {
+          icon = ShieldCheck;
+          color = 'text-teal-600 bg-teal-50 hover:bg-teal-600';
+          tagColor = "bg-teal-100 text-teal-700";
+        } else if (log.ipfsHash === "ACCESS_GRANT" || log.ipfsHash === "EMERGENCY_GRANT") {
+          icon = UserPlus;
+          color = 'text-secondary bg-secondary/5 hover:bg-secondary';
+          tagColor = "bg-secondary-container text-on-secondary-container";
+        } else if (log.ipfsHash === "EMERGENCY_TOGGLE") {
+          icon = log.recordType.includes('ENABLED') ? Unlock : Lock;
+          color = 'text-red-600 bg-red-50 hover:bg-red-600';
+          tagColor = "bg-red-100 text-red-700";
+        }
+
+        return {
+          id: index,
+          icon,
+          title: log.recordType,
+          time: log.formattedDate,
+          description: `Transaction: ${log.transactionHash.slice(0, 10)}...${log.transactionHash.slice(-8)}`,
+          ipfsHash: log.ipfsHash !== "LOGIN_EVENT" && !log.ipfsHash.includes('_') ? log.ipfsHash : null,
+          tag: log.isPendingSync ? 'SYNCING...' : 'VERIFIED IMMUTABLE',
+          color: log.isPendingSync ? 'text-outline bg-surface-container-high' : color,
+          tagColor,
+          isSimulated: log.isSimulated
+        };
+      });
 
       setActivities(mappedActivities);
     } catch (err) {

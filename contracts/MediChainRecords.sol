@@ -75,6 +75,11 @@ contract MediChainRecords {
         uint256 expiry
     );
 
+    event UserLogin(
+        address indexed user,
+        uint256 timestamp
+    );
+
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can perform this action");
         _;
@@ -88,6 +93,13 @@ contract MediChainRecords {
     constructor() {
         owner = msg.sender;
         authorizedUploaders[msg.sender] = true;
+    }
+
+    /**
+     * @dev Log a user login event on the blockchain
+     */
+    function logLogin() external {
+        emit UserLogin(msg.sender, block.timestamp);
     }
 
     /**

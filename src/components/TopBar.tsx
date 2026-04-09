@@ -1,6 +1,8 @@
 import React from 'react';
-import { Search, Bell, Moon, Sun, Share2, LogOut } from 'lucide-react';
+import { Search, Bell, Moon, Sun, Share2, LogOut, Wallet, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useMetaMask } from '../hooks/useMetaMask';
+import { cn } from '@/src/lib/utils';
 
 interface TopBarProps {
   user?: any;
@@ -10,6 +12,10 @@ interface TopBarProps {
 }
 
 export function TopBar({ user, isDarkMode, onToggleDarkMode, onLogout }: TopBarProps) {
+  const { walletAddress, connect, isConnecting } = useMetaMask();
+
+  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
   return (
     <header className="flex justify-between items-center w-full px-8 py-4 sticky top-0 bg-background/80 backdrop-blur-xl z-40 font-headline tracking-tight shadow-[0_20px_40px_rgba(25,28,30,0.06)]">
       <div className="flex items-center gap-6 flex-1">
@@ -24,6 +30,30 @@ export function TopBar({ user, isDarkMode, onToggleDarkMode, onLogout }: TopBarP
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Wallet Status */}
+        <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-surface-container-low border border-outline-variant/10">
+          <div className={cn(
+            "w-2 h-2 rounded-full animate-pulse",
+            walletAddress ? "bg-teal-500" : "bg-outline"
+          )} />
+          <div className="flex flex-col">
+            <span className="text-[9px] font-bold text-outline uppercase tracking-tighter leading-none mb-1">
+              {walletAddress ? 'Connected Wallet' : 'Wallet Disconnected'}
+            </span>
+            <span className="text-[11px] font-mono font-bold text-on-surface leading-none">
+              {walletAddress ? formatAddress(walletAddress) : 'No Wallet'}
+            </span>
+          </div>
+          <button 
+            onClick={() => connect(true)}
+            disabled={isConnecting}
+            className="ml-2 p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors"
+            title="Switch Account"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", isConnecting && "animate-spin")} />
+          </button>
+        </div>
+
         <motion.div 
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -52,8 +82,12 @@ export function TopBar({ user, isDarkMode, onToggleDarkMode, onLogout }: TopBarP
         
         <div className="flex items-center gap-3 ml-2">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-on-surface leading-none mb-1">{user?.email?.split('@')[0] || 'User'}</p>
-            <p className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none">{user?.role || 'Guest'}</p>
+            <p className="text-sm font-bold text-on-surface leading-none mb-1">
+              {user?.name || user?.email?.split('@')[0] || 'User'}
+            </p>
+            <p className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none">
+              {user?.role || 'Guest'}
+            </p>
           </div>
           <div className="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-white shadow-sm cursor-pointer hover:scale-105 transition-transform">
             <img 

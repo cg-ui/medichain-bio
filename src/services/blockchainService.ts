@@ -105,6 +105,57 @@ export async function simulateRecordOnChain(
 }
 
 /**
+ * Logs a user login event on the blockchain
+ */
+export async function logLoginOnChain() {
+  if (!window.ethereum) throw new Error("MetaMask is not installed");
+
+  try {
+    await ensureSepoliaNetwork();
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    
+    // Check if contract exists on this network
+    const code = await provider.getCode(CONTRACT_ADDRESS);
+    if (code === '0x' || code === '0x0') {
+      console.warn("Contract not deployed on this network, simulating login log");
+      return await simulateLogLogin(await signer.getAddress());
+    }
+
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, signer);
+    const tx = await contract.logLogin();
+    await tx.wait();
+    
+    return tx.hash;
+  } catch (err) {
+    console.error("Failed to log login on-chain:", err);
+    throw err;
+  }
+}
+
+/**
+ * Simulates a login log for demo purposes
+ */
+export async function simulateLogLogin(userAddress: string) {
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  const txHash = "0x" + Math.random().toString(16).slice(2, 10) + "...";
+  
+  const auditLog = JSON.parse(localStorage.getItem('medichain_simulated_logs') || '[]');
+  auditLog.unshift({
+    patientAddress: userAddress,
+    ipfsHash: "LOGIN_EVENT",
+    recordType: "User Login Verified",
+    timestamp: Math.floor(Date.now() / 1000),
+    uploader: userAddress,
+    transactionHash: txHash,
+    formattedDate: new Date().toLocaleString(),
+    isSimulated: true
+  });
+  localStorage.setItem('medichain_simulated_logs', JSON.stringify(auditLog));
+  return txHash;
+}
+
+/**
  * Conceptual function for uploading to IPFS via Pinata
  * @param file The file to upload
  * @returns The IPFS CID (Hash)
@@ -268,7 +319,8 @@ export async function fetchAuditLog(patientAddress?: string) {
       contract.filters.AccessGranted(filterAddress),
       contract.filters.AccessRevoked(filterAddress),
       contract.filters.EmergencyUnlockToggled(filterAddress),
-      contract.filters.EmergencyAccessGranted(filterAddress)
+      contract.filters.EmergencyAccessGranted(filterAddress),
+      contract.filters.UserLogin(filterAddress)
     ];
 
     // Fetch all events in parallel with a 4-second timeout (faster)
@@ -277,7 +329,7 @@ export async function fetchAuditLog(patientAddress?: string) {
       5000
     );
 
-    const [recordEvents, grantEvents, revokeEvents, unlockEvents, eGrantEvents] = eventResults;
+    const [recordEvents, grantEvents, revokeEvents, unlockEvents, eGrantEvents, loginEvents] = eventResults;
 
     const chainLogs = recordEvents.map(event => {
       const { patientAddress, ipfsHash, recordType, timestamp, uploader } = (event as any).args;
@@ -344,7 +396,20 @@ export async function fetchAuditLog(patientAddress?: string) {
       };
     });
 
-    return [...allLogs, ...chainLogs, ...grantLogs, ...revokeLogs, ...unlockLogs, ...eGrantLogs]
+    const loginLogs = loginEvents.map(event => {
+      const { user, timestamp } = (event as any).args;
+      return {
+        patientAddress: user,
+        ipfsHash: "LOGIN_EVENT",
+        recordType: "User Login Verified",
+        timestamp: Number(timestamp),
+        uploader: user,
+        transactionHash: event.transactionHash,
+        formattedDate: new Date(Number(timestamp) * 1000).toLocaleString()
+      };
+    });
+
+    return [...allLogs, ...chainLogs, ...grantLogs, ...revokeLogs, ...unlockLogs, ...eGrantLogs, ...loginLogs]
       .sort((a, b) => b.timestamp - a.timestamp);
 
   } catch (err) {

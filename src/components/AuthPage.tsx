@@ -3,12 +3,17 @@ import { Shield, User, Stethoscope, Mail, Lock, Eye, EyeOff, ArrowRight, Chrome,
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useMetaMask } from '../hooks/useMetaMask';
+import { toast } from 'sonner';
 
 interface AuthPageProps {
   onLogin: (user: any) => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
 }
+
+import { logLoginOnChain } from '../services/blockchainService';
+import { resolveEmailToAddress } from '../services/userService';
+import { ethers } from 'ethers';
 
 export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProps) {
   const [role, setRole] = useState<'patient' | 'doctor'>('patient');
@@ -20,6 +25,7 @@ export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProp
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   
   const { walletAddress, isConnecting, error: metamaskError, connect } = useMetaMask();
 
@@ -66,9 +72,25 @@ export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProp
   };
 
   const handleFinalizeLogin = async (address?: string) => {
+    setIsFinalizing(true);
+    setError(null);
     try {
-      // If we have a wallet address, we might want to update the user profile on the server
-      if (address) {
+      // If we have a wallet address, we MUST get a signature and log on-chain
+      if (address && window.ethereum) {
+        toast.info("Please confirm the verification signature in MetaMask");
+        
+        // 1. Request signature for identity verification
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const message = `MediChain-Bio Identity Verification\n\nTimestamp: ${new Date().toISOString()}\nWallet: ${address}\n\nBy signing this message, you are verifying your identity on the MediChain-Bio secure network.`;
+        await signer.signMessage(message);
+        
+        // 2. Log the login event on the blockchain (requires gas/confirmation)
+        toast.info("Recording login event on Sepolia blockchain...");
+        const txHash = await logLoginOnChain();
+        toast.success(`Login verified on-chain! Tx: ${txHash.slice(0, 10)}...`);
+        
+        // 3. Update the user profile on the server
         await fetch('/api/auth/update-wallet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -80,19 +102,26 @@ export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProp
       const res = await fetch('/api/auth/me');
       const data = await res.json();
       
-      onLogin({
-        ...data.user,
-        walletAddress: address || data.user.walletAddress || null,
-        isDemo: data.isDemo
-      });
-    } catch (err) {
-      // Fallback if update fails
-      onLogin({
-        email: email || 'user@medichain.bio',
-        walletAddress: address || null,
-        role,
-        name: name || (role === 'doctor' ? 'Dr. Mitchell' : 'Sarah Mitchell')
-      });
+      const userToLogin = {
+        ...(data.user || {}),
+        role: data.user?.role || role,
+        email: data.user?.email || email,
+        name: data.user?.name || name || (data.user?.email || email).split('@')[0],
+        walletAddress: address || data.user?.walletAddress || null,
+        isDemo: data.isDemo ?? true
+      };
+
+      console.log("Finalizing login with user:", userToLogin);
+      onLogin(userToLogin);
+    } catch (err: any) {
+      console.error("Finalization error:", err);
+      setError(err.message || "Failed to finalize secure login");
+      // If it's a user rejection, don't force them out, but show error
+      if (err.code === 4001) {
+        toast.error("Verification rejected. Secure features may be limited.");
+      }
+    } finally {
+      setIsFinalizing(false);
     }
   };
 
@@ -314,26 +343,47 @@ export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProp
                   <motion.button 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={connect}
-                    disabled={isConnecting}
+                    onClick={() => connect(true)}
+                    disabled={isConnecting || isFinalizing}
                     className="w-full py-5 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-3 shadow-xl shadow-primary/20 disabled:opacity-50"
                   >
-                    {isConnecting ? (
+                    {isConnecting || isFinalizing ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Connecting...
+                        {isConnecting ? 'Connecting...' : 'Verifying...'}
                       </>
                     ) : (
                       <>
                         <Wallet className="w-5 h-5" />
-                        Connect MetaMask
+                        {walletAddress ? 'Switch MetaMask Account' : 'Connect MetaMask'}
                       </>
                     )}
                   </motion.button>
 
+                  {walletAddress && !isFinalizing && (
+                    <div className="p-4 rounded-2xl bg-surface-container-low border border-primary/20 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-outline uppercase tracking-widest">Connected Wallet</p>
+                          <p className="text-xs font-mono font-bold text-on-surface">{formatAddress(walletAddress)}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleFinalizeLogin(walletAddress)}
+                        className="text-xs font-bold text-primary hover:underline"
+                      >
+                        Verify & Continue
+                      </button>
+                    </div>
+                  )}
+
                   <button 
                     onClick={() => handleFinalizeLogin()}
-                    className="w-full py-4 rounded-2xl bg-surface-container-low text-outline font-bold hover:text-on-surface transition-all"
+                    disabled={isFinalizing}
+                    className="w-full py-4 rounded-2xl bg-surface-container-low text-outline font-bold hover:text-on-surface transition-all disabled:opacity-50"
                   >
                     Skip for Now
                   </button>

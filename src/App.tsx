@@ -25,7 +25,8 @@ import { Activity, Droplets, Thermometer, Plus, LogOut, Stethoscope, Syringe, Cl
 import { motion, AnimatePresence } from 'motion/react';
 import { useEffect } from 'react';
 import { cn } from '@/src/lib/utils';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
+import { useMetaMask } from './hooks/useMetaMask';
 
 const heartRateData = [
   { value: 60 }, { value: 55 }, { value: 65 }, { value: 70 }, 
@@ -56,7 +57,10 @@ export default function App() {
 }
 
 function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') || 'dashboard';
+  });
   const [authLoading, setAuthLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -64,6 +68,19 @@ function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void })
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isFABMenuOpen, setIsFABMenuOpen] = useState(false);
   const { heartRate, spo2, temp, aiSignals } = useVitals();
+  const { walletAddress, connect } = useMetaMask();
+
+  useEffect(() => {
+    if (walletAddress && user && user.walletAddress && walletAddress.toLowerCase() !== user.walletAddress.toLowerCase()) {
+      toast.warning("Wallet Mismatch", {
+        description: "The connected MetaMask account does not match your profile's linked wallet.",
+        action: {
+          label: "Switch Account",
+          onClick: () => connect(true)
+        }
+      });
+    }
+  }, [walletAddress, user]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -79,7 +96,11 @@ function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void })
         const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
-          setUser(data.user);
+          const userData = {
+            ...(data.user || {}),
+            isDemo: data.isDemo ?? false
+          };
+          setUser(userData);
           if (data.isDemo) setIsDemo(true);
         }
       } catch (err) {
