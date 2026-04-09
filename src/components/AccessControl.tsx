@@ -80,9 +80,24 @@ export function AccessControl() {
       const durationSeconds = DURATION_MAP[duration];
       const currentPatient = walletAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
       
+      // 1. Backend Grant (for isolation enforcement)
+      try {
+        await fetch('/api/access/grant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            doctorEmail: email,
+            modules: selectedModules,
+            durationSeconds,
+            isEmergency: false
+          })
+        });
+      } catch (backendErr) {
+        console.error("Failed to save grant to backend:", backendErr);
+      }
+
+      // 2. Blockchain Grant
       if (method === 'metamask') {
-        // For metamask, we need a valid address. If email is entered, we'd need a lookup.
-        // For demo, if it doesn't look like an address, we'll use a mock one.
         const targetAddress = email.startsWith('0x') ? email : "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
         await grantAccessOnChain(targetAddress, selectedModules, durationSeconds);
       } else {
@@ -112,6 +127,21 @@ export function AccessControl() {
     setIsRevoking(true);
     try {
       const currentPatient = walletAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
+      
+      // 1. Backend Revoke
+      try {
+        await fetch('/api/access/revoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            doctorEmail: grantToRevoke.doctor
+          })
+        });
+      } catch (backendErr) {
+        console.error("Failed to revoke from backend:", backendErr);
+      }
+
+      // 2. Blockchain Revoke
       if (method === 'metamask') {
         await revokeAccessOnChain(grantToRevoke.doctor);
       } else {

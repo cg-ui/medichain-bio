@@ -6,6 +6,7 @@ import { cn } from '@/src/lib/utils';
 import { fetchAuditLog, isContractDeployed } from '../services/blockchainService';
 import { resolveEmailToAddress } from '../services/userService';
 import { useVitals } from '../context/VitalsContext';
+import { useAuth } from '../context/AuthContext';
 
 const weeklyHeartRate = [
   { day: 'MON', value: 65, type: 'resting' },
@@ -18,6 +19,7 @@ const weeklyHeartRate = [
 ];
 
 export function Reports() {
+  const { user } = useAuth();
   const [blockchainLogs, setBlockchainLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,27 +43,70 @@ export function Reports() {
       setError(null);
 
       let patientToFetch = targetPatient || undefined;
+      let patientIdToFetch = (user as any)?.id || (user as any)?._id;
 
       // If targetPatient is an email, try to resolve it first
       if (targetPatient && !targetPatient.startsWith('0x')) {
         console.log("Resolving email to address for reports:", targetPatient);
-        const resolved = await resolveEmailToAddress(targetPatient);
-        if (resolved) {
-          patientToFetch = resolved;
+        const res = await fetch(`/api/users/resolve/${targetPatient}`);
+        if (res.ok) {
+          const data = await res.json();
+          patientToFetch = data.address;
+          patientIdToFetch = data.id;
         } else {
           console.warn("Could not resolve email to address, using as is");
+        }
+      } else if (targetPatient && targetPatient.startsWith('0x')) {
+        // If it's an address, we might still need the patientId for the backend API
+        // We can add an endpoint to resolve address to ID if needed, or just try to find it
+        // For now, let's assume we can fetch by ID if we have it, or we might need to resolve address
+      }
+
+      // Fetch from backend API (Isolated and Authorized)
+      let backendReports: any[] = [];
+      if (patientIdToFetch) {
+        try {
+          const res = await fetch(`/api/reports/${patientIdToFetch}`);
+          if (res.ok) {
+            backendReports = await res.json();
+          }
+        } catch (err) {
+          console.error("Failed to fetch backend reports:", err);
         }
       }
 
       const logs = await fetchAuditLog(patientToFetch);
-      setBlockchainLogs(logs);
+      
+      // Merge backend reports with blockchain logs
+      // Backend reports are the "official" reports with metadata
+      const mergedReports = backendReports.map(br => ({
+        patientAddress: patientToFetch,
+        ipfsHash: br.fileUrl,
+        recordType: br.recordType,
+        timestamp: Math.floor(new Date(br.timestamp).getTime() / 1000),
+        uploader: br.uploadedBy,
+        transactionHash: br.fileHash,
+        formattedDate: new Date(br.timestamp).toLocaleString(),
+        fileName: br.fileName,
+        isBackend: true
+      }));
+
+      // Combine with blockchain logs, avoiding duplicates by transaction hash
+      const combinedLogs = [...mergedReports];
+      logs.forEach((l: any) => {
+        if (!combinedLogs.some(cl => cl.transactionHash === l.transactionHash)) {
+          combinedLogs.push(l);
+        }
+      });
+
+      setBlockchainLogs(combinedLogs.sort((a, b) => b.timestamp - a.timestamp));
     } catch (err: any) {
-      console.error("Failed to fetch blockchain logs:", err);
-      setError(err.message || "Failed to connect to blockchain");
+      console.error("Failed to fetch logs:", err);
+      setError(err.message || "Failed to connect to data source");
     } finally {
       setLoadingLogs(false);
     }
-  }, [targetPatient]);
+  }, [targetPatient, user]);
 
   useEffect(() => {
     const init = async () => {

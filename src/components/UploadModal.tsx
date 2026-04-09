@@ -67,6 +67,37 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
       }
       
       setTxHash(receipt.hash);
+      
+      // 3. Save metadata to backend for isolation and authorization
+      try {
+        const payload: any = {
+          fileUrl: ipfsHash,
+          fileHash: receipt.hash,
+          recordType,
+          fileName: file.name
+        };
+
+        if (user?.role === 'patient') {
+          payload.patientEmail = user.email;
+        } else {
+          // If doctor, patientAddress could be email or wallet address
+          if (patientAddress.includes('@')) {
+            payload.patientEmail = patientAddress;
+          } else {
+            payload.patientAddress = patientAddress;
+          }
+        }
+
+        await fetch('/api/reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (backendErr) {
+        console.error("Failed to save metadata to backend:", backendErr);
+        // We don't block the UI if backend save fails, but in production this should be handled
+      }
+
       setStatus('success');
       window.dispatchEvent(new CustomEvent('blockchain-update', { 
         detail: { 
