@@ -73,14 +73,7 @@ export function PatientProfile() {
 
     setIsToggling(true);
     try {
-      // 1. Backend Toggle
-      await fetch('/api/access/emergency-toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: !isEmergencyUnlockEnabled })
-      });
-
-      // 2. Blockchain Toggle
+      // For demo purposes, we'll ask if they want to simulate or use MetaMask
       const useMetaMask = window.confirm("Use MetaMask for this transaction? (Cancel for simulation)");
       
       if (useMetaMask) {

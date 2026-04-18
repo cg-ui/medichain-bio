@@ -1,31 +1,38 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Calendar, Activity, Droplets, Thermometer, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2, RefreshCw, BrainCircuit, AlertTriangle, Info as InfoIcon, Copy, Check, ShieldAlert } from 'lucide-react';
+import { Download, Calendar, Activity, AlertCircle, Lightbulb, ExternalLink, ShieldCheck, Loader2, RefreshCw, BrainCircuit, AlertTriangle, Info as InfoIcon, Copy, Check, ShieldAlert, FileText, DollarSign } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { fetchAuditLog, isContractDeployed } from '../services/blockchainService';
 import { resolveEmailToAddress } from '../services/userService';
 import { useVitals } from '../context/VitalsContext';
-import { useAuth } from '../context/AuthContext';
 
-const weeklyHeartRate = [
-  { day: 'MON', value: 65, type: 'resting' },
-  { day: 'TUE', value: 58, type: 'resting' },
-  { day: 'WED', value: 72, type: 'active' },
-  { day: 'THU', value: 85, type: 'active' },
-  { day: 'FRI', value: 60, type: 'resting' },
-  { day: 'SAT', value: 68, type: 'resting' },
-  { day: 'SUN', value: 75, type: 'active' },
+const weeklyCoverage = [
+  { day: 'MON', value: 245000, type: 'coverage' },
+  { day: 'TUE', value: 242000, type: 'coverage' },
+  { day: 'WED', value: 238000, type: 'coverage' },
+  { day: 'THU', value: 236000, type: 'coverage' },
+  { day: 'FRI', value: 233500, type: 'coverage' },
+  { day: 'SAT', value: 231000, type: 'coverage' },
+  { day: 'SUN', value: 229000, type: 'coverage' },
 ];
 
 export function Reports() {
-  const { user } = useAuth();
   const [blockchainLogs, setBlockchainLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isContractDetected, setIsContractDetected] = useState(true);
-  const { heartRate, spo2, temp, aiSignals } = useVitals();
+  const {
+    coverageAmount,
+    claimsFiled,
+    deductibleStatus,
+    outOfPocket,
+    premiumDue,
+    policyNumber,
+    insuranceProvider,
+    insuranceSignals
+  } = useVitals();
   
   // Get patient address from URL if accessing as a doctor
   const queryParams = new URLSearchParams(window.location.search);
@@ -43,70 +50,27 @@ export function Reports() {
       setError(null);
 
       let patientToFetch = targetPatient || undefined;
-      let patientIdToFetch = (user as any)?.id || (user as any)?._id;
 
       // If targetPatient is an email, try to resolve it first
       if (targetPatient && !targetPatient.startsWith('0x')) {
         console.log("Resolving email to address for reports:", targetPatient);
-        const res = await fetch(`/api/users/resolve/${targetPatient}`);
-        if (res.ok) {
-          const data = await res.json();
-          patientToFetch = data.address;
-          patientIdToFetch = data.id;
+        const resolved = await resolveEmailToAddress(targetPatient);
+        if (resolved) {
+          patientToFetch = resolved;
         } else {
           console.warn("Could not resolve email to address, using as is");
-        }
-      } else if (targetPatient && targetPatient.startsWith('0x')) {
-        // If it's an address, we might still need the patientId for the backend API
-        // We can add an endpoint to resolve address to ID if needed, or just try to find it
-        // For now, let's assume we can fetch by ID if we have it, or we might need to resolve address
-      }
-
-      // Fetch from backend API (Isolated and Authorized)
-      let backendReports: any[] = [];
-      if (patientIdToFetch) {
-        try {
-          const res = await fetch(`/api/reports/${patientIdToFetch}`);
-          if (res.ok) {
-            backendReports = await res.json();
-          }
-        } catch (err) {
-          console.error("Failed to fetch backend reports:", err);
         }
       }
 
       const logs = await fetchAuditLog(patientToFetch);
-      
-      // Merge backend reports with blockchain logs
-      // Backend reports are the "official" reports with metadata
-      const mergedReports = backendReports.map(br => ({
-        patientAddress: patientToFetch,
-        ipfsHash: br.fileUrl,
-        recordType: br.recordType,
-        timestamp: Math.floor(new Date(br.timestamp).getTime() / 1000),
-        uploader: br.uploadedBy,
-        transactionHash: br.fileHash,
-        formattedDate: new Date(br.timestamp).toLocaleString(),
-        fileName: br.fileName,
-        isBackend: true
-      }));
-
-      // Combine with blockchain logs, avoiding duplicates by transaction hash
-      const combinedLogs = [...mergedReports];
-      logs.forEach((l: any) => {
-        if (!combinedLogs.some(cl => cl.transactionHash === l.transactionHash)) {
-          combinedLogs.push(l);
-        }
-      });
-
-      setBlockchainLogs(combinedLogs.sort((a, b) => b.timestamp - a.timestamp));
+      setBlockchainLogs(logs);
     } catch (err: any) {
-      console.error("Failed to fetch logs:", err);
-      setError(err.message || "Failed to connect to data source");
+      console.error("Failed to fetch blockchain logs:", err);
+      setError(err.message || "Failed to connect to blockchain");
     } finally {
       setLoadingLogs(false);
     }
-  }, [targetPatient, user]);
+  }, [targetPatient]);
 
   useEffect(() => {
     const init = async () => {
@@ -189,33 +153,33 @@ export function Reports() {
         <div className="lg:col-span-2 bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-sm border border-outline-variant/10">
           <div className="flex justify-between items-start mb-8">
             <div>
-              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{heartRate.label}</p>
+              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{coverageAmount.label}</p>
               <div className="flex items-baseline gap-2">
-                <h2 className="text-4xl font-headline font-extrabold text-on-surface">{heartRate.value}</h2>
-                <span className="text-xs font-bold text-outline">{heartRate.unit}</span>
+                <h2 className="text-4xl font-headline font-extrabold text-on-surface">${coverageAmount.value.toLocaleString()}</h2>
+                <span className="text-xs font-bold text-outline">{coverageAmount.unit}</span>
                 <span className={cn(
                   "ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold",
-                  heartRate.status === 'NORMAL' ? "bg-tertiary-fixed text-on-tertiary-fixed" : "bg-red-100 text-red-700"
+                  coverageAmount.status === 'ACTIVE' ? "bg-tertiary-fixed text-on-tertiary-fixed" : "bg-red-100 text-red-700"
                 )}>
-                  {heartRate.status}
+                  {coverageAmount.status}
                 </span>
               </div>
             </div>
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-primary/40" />
-                <span className="text-[10px] font-bold text-outline">Resting</span>
+                <span className="text-[10px] font-bold text-outline">Latest</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-primary" />
-                <span className="text-[10px] font-bold text-outline">Active</span>
+                <span className="text-[10px] font-bold text-outline">Trend</span>
               </div>
             </div>
           </div>
 
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyHeartRate}>
+              <BarChart data={weeklyCoverage}>
                 <XAxis 
                   dataKey="day" 
                   axisLine={false} 
@@ -228,8 +192,8 @@ export function Reports() {
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
                 />
                 <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
-                  {weeklyHeartRate.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.type === 'active' ? '#003d9b' : '#003d9b66'} />
+                  {weeklyCoverage.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.type === 'coverage' ? '#003d9b' : '#003d9b66'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -241,13 +205,13 @@ export function Reports() {
         <div className="space-y-6">
           <div className="bg-primary p-8 rounded-[2.5rem] text-white relative overflow-hidden">
             <div className="relative z-10">
-              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest mb-2">Health Risk Score</p>
-              <h2 className="text-6xl font-headline font-extrabold mb-4">98<span className="text-2xl opacity-50">/100</span></h2>
+              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest mb-2">Insurance Provider</p>
+              <h2 className="text-3xl font-headline font-extrabold mb-2">{insuranceProvider.value}</h2>
               <p className="text-xs opacity-80 leading-relaxed mb-6">
-                Your biometrics are within optimal ranges. Blockchain verification suggests no tampering in latest data blocks.
+                Provider verified on-chain with live policy performance tracking.
               </p>
               <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-[10px] font-bold hover:bg-white/20 transition-all">
-                <ShieldCheck className="w-4 h-4" /> Immutable Verification
+                <ShieldCheck className="w-4 h-4" /> Provider Verified
               </button>
             </div>
             <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
@@ -255,23 +219,23 @@ export function Reports() {
 
           <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-outline-variant/10 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{spo2.label}</p>
-              <h3 className="text-3xl font-headline font-extrabold text-on-surface">{spo2.value}{spo2.unit}</h3>
+              <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{claimsFiled.label}</p>
+              <h3 className="text-3xl font-headline font-extrabold text-on-surface">{claimsFiled.value}</h3>
             </div>
             <div className={cn(
               "w-12 h-12 rounded-full flex items-center justify-center",
-              spo2.status === 'NORMAL' ? "bg-secondary/10 text-secondary" : "bg-red-100 text-red-600"
+              claimsFiled.status === 'ACTIVE' ? "bg-secondary/10 text-secondary" : "bg-red-100 text-red-600"
             )}>
-              <Droplets className="w-6 h-6" />
+              <FileText className="w-6 h-6" />
             </div>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Temperature Card */}
+        {/* Insurance Summary Card */}
         <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-sm border border-outline-variant/10 flex flex-col items-center justify-center text-center">
-          <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-4">{temp.label}</p>
+          <p className="text-[10px] font-bold text-outline uppercase tracking-widest mb-4">{outOfPocket.label}</p>
           <div className="relative w-40 h-40 flex items-center justify-center mb-4">
             <svg className="w-full h-full transform -rotate-90">
               <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-surface-container-low" />
@@ -281,78 +245,70 @@ export function Reports() {
                 strokeWidth="12" 
                 fill="transparent" 
                 strokeDasharray={440} 
-                strokeDashoffset={440 * (1 - (temp.value - 90) / 20)} 
-                className={temp.status === 'STABLE' ? "text-tertiary" : "text-red-500"} 
+                strokeDashoffset={440 * (1 - Math.min(1, (outOfPocket.value as number) / 10000))} 
+                className={outOfPocket.status === 'ACTIVE' ? "text-tertiary" : "text-red-500"} 
                 strokeLinecap="round" 
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <Thermometer className={cn("w-8 h-8 mb-1", temp.status === 'STABLE' ? "text-tertiary" : "text-red-500")} />
-              <span className="text-2xl font-headline font-extrabold text-on-surface">{temp.value}{temp.unit}</span>
+              <DollarSign className={cn("w-8 h-8 mb-1", outOfPocket.status === 'ACTIVE' ? "text-tertiary" : "text-red-500")} />
+              <span className="text-2xl font-headline font-extrabold text-on-surface">${(outOfPocket.value as number).toLocaleString()}</span>
             </div>
           </div>
           <div className="flex gap-8 w-full">
             <div className="flex-1">
-              <p className="text-[10px] text-outline font-bold">Highest (Today)</p>
-              <p className="text-sm font-bold text-on-surface">99.1°F</p>
+              <p className="text-[10px] text-outline font-bold">Next Premium</p>
+              <p className="text-sm font-bold text-on-surface">{premiumDue.value}</p>
             </div>
             <div className="flex-1">
-              <p className="text-[10px] text-outline font-bold">Lowest (Today)</p>
-              <p className="text-sm font-bold text-on-surface">97.8°F</p>
+              <p className="text-[10px] text-outline font-bold">Policy ID</p>
+              <p className="text-sm font-bold text-on-surface">{policyNumber.value}</p>
             </div>
           </div>
         </div>
 
-        {/* AI Signals */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-headline font-bold text-on-surface">Diagnostic AI Signals</h3>
-            <button className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline">View All History</button>
-          </div>
-          
-          <div className="space-y-4">
-            {aiSignals.map((signal, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn(
-                  "p-6 rounded-3xl border-l-4 shadow-sm flex items-start gap-4",
-                  signal.type === 'critical' ? "bg-red-50 border-red-500" :
-                  signal.type === 'warning' ? "bg-amber-50 border-amber-500" :
-                  "bg-surface-container-lowest border-teal-500"
-                )}
-              >
-                <div className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center",
-                  signal.type === 'critical' ? "bg-red-100 text-red-500" :
-                  signal.type === 'warning' ? "bg-amber-100 text-amber-500" :
-                  "bg-teal-50 text-teal-500"
-                )}>
-                  {signal.type === 'critical' ? <AlertTriangle className="w-6 h-6" /> : 
-                   signal.type === 'warning' ? <AlertTriangle className="w-6 h-6" /> : 
-                   <BrainCircuit className="w-6 h-6" />}
+        <div className="lg:col-span-2 space-y-4">
+          {insuranceSignals.map((signal, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn(
+                "p-6 rounded-3xl border-l-4 shadow-sm flex items-start gap-4",
+                signal.type === 'critical' ? "bg-red-50 border-red-500" :
+                signal.type === 'warning' ? "bg-amber-50 border-amber-500" :
+                "bg-surface-container-lowest border-teal-500"
+              )}
+            >
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center",
+                signal.type === 'critical' ? "bg-red-100 text-red-500" :
+                signal.type === 'warning' ? "bg-amber-100 text-amber-500" :
+                "bg-teal-50 text-teal-500"
+              )}>
+                {signal.type === 'critical' ? <AlertTriangle className="w-6 h-6" /> : 
+                 signal.type === 'warning' ? <AlertTriangle className="w-6 h-6" /> : 
+                 <BrainCircuit className="w-6 h-6" />}
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between mb-1">
+                  <h4 className="font-bold text-on-surface">{signal.message}</h4>
+                  <span className="text-[10px] font-bold text-outline">{signal.timestamp}</span>
                 </div>
-                <div className="flex-1">
-                  <div className="flex justify-between mb-1">
-                    <h4 className="font-bold text-on-surface">{signal.message}</h4>
-                    <span className="text-[10px] font-bold text-outline">{signal.timestamp}</span>
-                  </div>
-                  <p className="text-xs text-on-surface-variant mb-4">
-                    {signal.type === 'info' 
-                      ? "Real-time biometric analysis confirms all parameters are within safe clinical thresholds. Blockchain integrity verified."
-                      : "Automated analysis detected a deviation from your clinical baseline. This event has been logged to your immutable medical ledger."}
-                  </p>
-                  <div className="flex gap-2">
-                    <span className="px-3 py-1 rounded-full bg-surface-container-low text-[10px] font-bold text-outline">Ref: Live Stream</span>
-                    {signal.type !== 'info' && (
-                      <button className="px-3 py-1 rounded-full bg-primary/10 text-[10px] font-bold text-primary hover:bg-primary/20 transition-all">Alert Provider</button>
-                    )}
-                  </div>
+                <p className="text-xs text-on-surface-variant mb-4">
+                  {signal.type === 'info' 
+                    ? "Insurance coverage is stable and no urgent claims actions are required. Blockchain validation adds audit confidence."
+                    : "Automated insurance risk detection flagged a coverage or claims issue. This event has been recorded in the immutable ledger."}
+                </p>
+                <div className="flex gap-2">
+                  <span className="px-3 py-1 rounded-full bg-surface-container-low text-[10px] font-bold text-outline">Ref: Policy Audit</span>
+                  {signal.type !== 'info' && (
+                    <button className="px-3 py-1 rounded-full bg-primary/10 text-[10px] font-bold text-primary hover:bg-primary/20 transition-all">Notify Provider</button>
+                  )}
                 </div>
-              </motion.div>
-            ))}
-          </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
       </div>
 

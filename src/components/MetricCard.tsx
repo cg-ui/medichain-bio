@@ -11,9 +11,10 @@ interface MetricCardProps {
   status: string;
   colorClass: string;
   data: any[];
+  description?: string;
 }
 
-export function MetricCard({ icon: Icon, label, value, unit, status, colorClass, data }: MetricCardProps) {
+export function MetricCard({ icon: Icon, label, value, unit, status, colorClass, data, description }: MetricCardProps) {
   return (
     <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant/10 relative overflow-hidden group">
       <div className={cn("absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity", colorClass)}>
@@ -34,6 +35,10 @@ export function MetricCard({ icon: Icon, label, value, unit, status, colorClass,
         <span className="text-4xl font-headline font-extrabold tracking-tight">{value}</span>
         <span className="text-outline font-medium">{unit}</span>
       </div>
+
+      {description && (
+        <p className="text-outline text-sm mb-4 leading-relaxed">{description}</p>
+      )}
 
       <div className="h-16 w-full opacity-50">
         <ResponsiveContainer width="100%" height="100%">

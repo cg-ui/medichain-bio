@@ -7,7 +7,8 @@ declare global {
   }
 }
 
-// Replace with your deployed contract address
+// IMPORTANT: Replace this with your actual deployed contract address on Sepolia.
+// Currently set to a placeholder wallet address for demonstration.
 const CONTRACT_ADDRESS = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"; 
 
 const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111
@@ -239,23 +240,29 @@ export async function addRecordOnChain(
 ) {
   if (!window.ethereum) throw new Error("MetaMask is not installed");
 
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  
-  const contract = new ethers.Contract(
-    CONTRACT_ADDRESS,
-    MediChainArtifact.abi,
-    signer
-  );
+  try {
+    await ensureSepoliaNetwork();
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      MediChainArtifact.abi,
+      signer
+    );
 
-  console.log(`Recording ${recordType} on-chain for patient ${patientAddress}...`);
-  
-  const tx = await contract.addMedicalRecord(patientAddress, ipfsHash, recordType);
-  const receipt = await tx.wait();
-  
-  const hash = receipt.hash || receipt.transactionHash;
-  console.log("Transaction confirmed:", hash);
-  return { ...receipt, hash, ipfsHash };
+    console.log(`Recording ${recordType} on-chain for patient ${patientAddress}...`);
+    
+    const tx = await contract.addMedicalRecord(patientAddress, ipfsHash, recordType);
+    const receipt = await tx.wait();
+    
+    const hash = receipt.hash || receipt.transactionHash;
+    console.log("Transaction confirmed:", hash);
+    return { ...receipt, hash, ipfsHash };
+  } catch (err) {
+    console.error("Failed to add record on-chain:", err);
+    throw err;
+  }
 }
 
 /**
@@ -323,10 +330,11 @@ export async function fetchAuditLog(patientAddress?: string) {
       contract.filters.UserLogin(filterAddress)
     ];
 
-    // Fetch all events in parallel with a 4-second timeout (faster)
+    // Fetch all events in parallel with a 10-second timeout
+    // Using a larger block range (last 50,000 blocks ~ 1 week)
     const eventResults = await withTimeout(
-      Promise.all(filters.map(f => contract.queryFilter(f, -3000))), // Last 3000 blocks for speed
-      5000
+      Promise.all(filters.map(f => contract.queryFilter(f, -50000))), 
+      10000
     );
 
     const [recordEvents, grantEvents, revokeEvents, unlockEvents, eGrantEvents, loginEvents] = eventResults;
@@ -424,21 +432,27 @@ export async function fetchAuditLog(patientAddress?: string) {
 export async function grantAccessOnChain(doctorAddress: string, modules: string[], duration: number) {
   if (!window.ethereum) throw new Error("MetaMask is not installed");
 
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  
-  const contract = new ethers.Contract(
-    CONTRACT_ADDRESS,
-    MediChainArtifact.abi,
-    signer
-  );
+  try {
+    await ensureSepoliaNetwork();
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      MediChainArtifact.abi,
+      signer
+    );
 
-  console.log(`Granting access to ${doctorAddress} for ${modules.join(', ')}...`);
-  
-  const tx = await contract.grantAccess(doctorAddress, modules, duration);
-  const receipt = await tx.wait();
-  
-  return receipt;
+    console.log(`Granting access to ${doctorAddress} for ${modules.join(', ')}...`);
+    
+    const tx = await contract.grantAccess(doctorAddress, modules, duration);
+    const receipt = await tx.wait();
+    
+    return receipt;
+  } catch (err) {
+    console.error("Failed to grant access on-chain:", err);
+    throw err;
+  }
 }
 
 /**
@@ -447,21 +461,27 @@ export async function grantAccessOnChain(doctorAddress: string, modules: string[
 export async function revokeAccessOnChain(doctorAddress: string) {
   if (!window.ethereum) throw new Error("MetaMask is not installed");
 
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  
-  const contract = new ethers.Contract(
-    CONTRACT_ADDRESS,
-    MediChainArtifact.abi,
-    signer
-  );
+  try {
+    await ensureSepoliaNetwork();
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      MediChainArtifact.abi,
+      signer
+    );
 
-  console.log(`Revoking access from ${doctorAddress}...`);
-  
-  const tx = await contract.revokeAccess(doctorAddress);
-  const receipt = await tx.wait();
-  
-  return receipt;
+    console.log(`Revoking access from ${doctorAddress}...`);
+    
+    const tx = await contract.revokeAccess(doctorAddress);
+    const receipt = await tx.wait();
+    
+    return receipt;
+  } catch (err) {
+    console.error("Failed to revoke access on-chain:", err);
+    throw err;
+  }
 }
 
 /**
@@ -469,12 +489,18 @@ export async function revokeAccessOnChain(doctorAddress: string) {
  */
 export async function toggleEmergencyUnlockOnChain(status: boolean) {
   if (!window.ethereum) throw new Error("MetaMask is not installed");
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, signer);
-  
-  const tx = await contract.toggleEmergencyUnlock(status);
-  return await tx.wait();
+  try {
+    await ensureSepoliaNetwork();
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, signer);
+    
+    const tx = await contract.toggleEmergencyUnlock(status);
+    return await tx.wait();
+  } catch (err) {
+    console.error("Failed to toggle emergency unlock on-chain:", err);
+    throw err;
+  }
 }
 
 /**
@@ -482,12 +508,18 @@ export async function toggleEmergencyUnlockOnChain(status: boolean) {
  */
 export async function grantEmergencyAccessOnChain(patientAddress: string, reason: string) {
   if (!window.ethereum) throw new Error("MetaMask is not installed");
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, signer);
-  
-  const tx = await contract.grantEmergencyAccess(patientAddress, reason);
-  return await tx.wait();
+  try {
+    await ensureSepoliaNetwork();
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, MediChainArtifact.abi, signer);
+    
+    const tx = await contract.grantEmergencyAccess(patientAddress, reason);
+    return await tx.wait();
+  } catch (err) {
+    console.error("Failed to grant emergency access on-chain:", err);
+    throw err;
+  }
 }
 
 /**

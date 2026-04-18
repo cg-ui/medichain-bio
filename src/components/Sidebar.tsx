@@ -18,6 +18,7 @@ import { motion } from 'motion/react';
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'patient-profile', icon: Users, label: 'Patient Profile' },
+  { id: 'doctor-profile', icon: Shield, label: 'Doctor Profile' },
   { id: 'patients', icon: Users, label: 'Patients' },
   { id: 'reports', icon: FileText, label: 'Reports' },
   { id: 'blockchain', icon: Database, label: 'Blockchain' },
@@ -36,6 +37,7 @@ interface SidebarProps {
 export function Sidebar({ activeTab, onTabChange, onLogout, onUploadClick, user }: SidebarProps) {
   const filteredNavItems = navItems.filter(item => {
     if (item.id === 'patient-profile' && user?.role === 'doctor') return false;
+    if (item.id === 'doctor-profile' && user?.role === 'patient') return false;
     if (item.id === 'patients' && user?.role === 'patient') return false;
     return true;
   });

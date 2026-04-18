@@ -12,6 +12,7 @@ import { QuickActions } from './components/QuickActions';
 import { TrustScoreCard } from './components/TrustScoreCard';
 import { ProviderPanel } from './components/ProviderPanel';
 import { PatientProfile } from './components/PatientProfile';
+import { DoctorProfile } from './components/DoctorProfile';
 import { AccessControl } from './components/AccessControl';
 import { Emergency } from './components/Emergency';
 import { Reports } from './components/Reports';
@@ -21,27 +22,12 @@ import { UploadModal } from './components/UploadModal';
 import { MedicalUpdateModal } from './components/MedicalUpdateModal';
 import { VitalsProvider, useVitals } from './context/VitalsContext';
 import { AuthProvider } from './context/AuthContext';
-import { Activity, Droplets, Thermometer, Plus, LogOut, Stethoscope, Syringe, ClipboardList, Upload as UploadIcon, BrainCircuit, AlertTriangle, Info as InfoIcon } from 'lucide-react';
+import { Plus, LogOut, Stethoscope, Syringe, ClipboardList, Upload as UploadIcon, BrainCircuit, AlertTriangle, Info as InfoIcon, Shield, DollarSign, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useEffect } from 'react';
 import { cn } from '@/src/lib/utils';
 import { Toaster, toast } from 'sonner';
 import { useMetaMask } from './hooks/useMetaMask';
-
-const heartRateData = [
-  { value: 60 }, { value: 55 }, { value: 65 }, { value: 70 }, 
-  { value: 62 }, { value: 58 }, { value: 64 }, { value: 60 }
-];
-
-const spo2Data = [
-  { value: 90 }, { value: 92 }, { value: 95 }, { value: 94 }, 
-  { value: 93 }, { value: 95 }, { value: 92 }, { value: 94 }
-];
-
-const tempData = [
-  { value: 40 }, { value: 42 }, { value: 41 }, { value: 43 }, 
-  { value: 42 }, { value: 45 }, { value: 42 }, { value: 41 }
-];
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -67,7 +53,16 @@ function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void })
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isFABMenuOpen, setIsFABMenuOpen] = useState(false);
-  const { heartRate, spo2, temp, aiSignals } = useVitals();
+  const {
+    insuranceProvider,
+    policyNumber,
+    coverageAmount,
+    claimsFiled,
+    deductibleStatus,
+    outOfPocket,
+    premiumDue,
+    insuranceSignals
+  } = useVitals();
   const { walletAddress, connect } = useMetaMask();
 
   useEffect(() => {
@@ -147,6 +142,10 @@ function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void })
       setActiveTab('dashboard');
       return null;
     }
+    if (activeTab === 'doctor-profile' && user?.role === 'patient') {
+      setActiveTab('dashboard');
+      return null;
+    }
     if (activeTab === 'patients' && user?.role === 'patient') {
       setActiveTab('dashboard');
       return null;
@@ -158,55 +157,91 @@ function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void })
           <div className="p-8 max-w-[1600px] mx-auto w-full">
             {/* Hero Header */}
             <section className="mb-10">
-              <h2 className="text-3xl font-headline font-extrabold text-on-surface tracking-tight mb-1">Clinical Overview</h2>
-              <p className="text-outline font-medium">Real-time biometrics and blockchain-secured synchronization.</p>
+              <h2 className="text-3xl font-headline font-extrabold text-on-surface tracking-tight mb-1">Insurance Overview</h2>
+              <p className="text-outline font-medium">Real-time insurance coverage and claims tracking.</p>
             </section>
 
-            {/* Metrics Bento Grid */}
+            {/* Insurance Metrics Bento Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <MetricCard 
-                icon={Activity}
-                label={heartRate.label}
-                value={heartRate.value.toString()}
-                unit={heartRate.unit}
-                status={heartRate.status}
+                icon={Shield}
+                label={coverageAmount.label}
+                value={`$${coverageAmount.value.toLocaleString()}`}
+                unit={coverageAmount.unit || ''}
+                status={coverageAmount.status}
                 colorClass="text-primary"
-                data={heartRate.history}
+                data={coverageAmount.history}
+                description={coverageAmount.description}
               />
               <MetricCard 
-                icon={Droplets}
-                label={spo2.label}
-                value={spo2.value.toString()}
-                unit={spo2.unit}
-                status={spo2.status}
+                icon={FileText}
+                label={claimsFiled.label}
+                value={claimsFiled.value.toString()}
+                unit={claimsFiled.unit || ''}
+                status={claimsFiled.status}
                 colorClass="text-secondary"
-                data={spo2.history}
+                data={claimsFiled.history}
+                description={claimsFiled.description}
               />
               <MetricCard 
-                icon={Thermometer}
-                label={temp.label}
-                value={temp.value.toString()}
-                unit={temp.unit}
-                status={temp.status}
+                icon={DollarSign}
+                label={deductibleStatus.label}
+                value={`$${deductibleStatus.value.toLocaleString()}`}
+                unit={deductibleStatus.unit || ''}
+                status={deductibleStatus.status}
                 colorClass="text-tertiary"
-                data={temp.history}
+                data={deductibleStatus.history}
+                description={deductibleStatus.description}
               />
             </div>
 
-            {/* AI Diagnostic Signals */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <MetricCard 
+                icon={Shield}
+                label={outOfPocket.label}
+                value={`$${outOfPocket.value.toLocaleString()}`}
+                unit={outOfPocket.unit || ''}
+                status={outOfPocket.status}
+                colorClass="text-slate-600"
+                data={outOfPocket.history}
+                description={outOfPocket.description}
+              />
+              <MetricCard 
+                icon={DollarSign}
+                label={premiumDue.label}
+                value={premiumDue.value.toString()}
+                unit=""
+                status={premiumDue.status}
+                colorClass="text-emerald-600"
+                data={[]}
+                description={premiumDue.description}
+              />
+              <MetricCard 
+                icon={FileText}
+                label={policyNumber.label}
+                value={policyNumber.value.toString()}
+                unit=""
+                status={policyNumber.status}
+                colorClass="text-blue-600"
+                data={[]}
+                description={policyNumber.description}
+              />
+            </div>
+
+            {/* Insurance Alerts Section */}
             <section className="mb-8">
               <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-primary/20 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-5">
-                  <BrainCircuit className="w-24 h-24 text-primary" />
+                  <Shield className="w-24 h-24 text-primary" />
                 </div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                    <BrainCircuit className="w-6 h-6" />
+                    <Shield className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-headline font-bold text-on-surface">Diagnostic AI Signals</h3>
+                  <h3 className="text-xl font-headline font-bold text-on-surface">Insurance Alerts</h3>
                 </div>
                 <div className="space-y-3 relative z-10">
-                  {aiSignals.map((signal, idx) => (
+                  {insuranceSignals.map((signal, idx) => (
                     <motion.div 
                       key={idx}
                       initial={{ opacity: 0, x: -20 }}
@@ -250,6 +285,8 @@ function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void })
         return <ProviderPanel />;
       case 'patient-profile':
         return <PatientProfile />;
+      case 'doctor-profile':
+        return <DoctorProfile />;
       case 'access-control':
         return <AccessControl />;
       case 'emergency':

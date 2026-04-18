@@ -3,6 +3,7 @@ import { Shield, Stethoscope, UserCog, User, Activity, Beaker, FileText, Clock, 
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { fetchAccessGrants, grantAccessOnChain, revokeAccessOnChain, simulateGrantAccess, simulateRevokeAccess, fetchAuditLog } from '../services/blockchainService';
+import { resolveEmailToAddress } from '../services/userService';
 import { useMetaMask } from '../hooks/useMetaMask';
 
 const DURATION_MAP: Record<string, number> = {
@@ -80,25 +81,15 @@ export function AccessControl() {
       const durationSeconds = DURATION_MAP[duration];
       const currentPatient = walletAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
       
-      // 1. Backend Grant (for isolation enforcement)
-      try {
-        await fetch('/api/access/grant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            doctorEmail: email,
-            modules: selectedModules,
-            durationSeconds,
-            isEmergency: false
-          })
-        });
-      } catch (backendErr) {
-        console.error("Failed to save grant to backend:", backendErr);
-      }
-
-      // 2. Blockchain Grant
       if (method === 'metamask') {
-        const targetAddress = email.startsWith('0x') ? email : "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
+        let targetAddress = email;
+        if (!email.startsWith('0x')) {
+          const resolved = await resolveEmailToAddress(email);
+          if (!resolved) {
+            throw new Error(`Could not resolve email ${email} to a wallet address.`);
+          }
+          targetAddress = resolved;
+        }
         await grantAccessOnChain(targetAddress, selectedModules, durationSeconds);
       } else {
         await simulateGrantAccess(currentPatient, email, selectedModules, durationSeconds);
@@ -127,21 +118,6 @@ export function AccessControl() {
     setIsRevoking(true);
     try {
       const currentPatient = walletAddress || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
-      
-      // 1. Backend Revoke
-      try {
-        await fetch('/api/access/revoke', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            doctorEmail: grantToRevoke.doctor
-          })
-        });
-      } catch (backendErr) {
-        console.error("Failed to revoke from backend:", backendErr);
-      }
-
-      // 2. Blockchain Revoke
       if (method === 'metamask') {
         await revokeAccessOnChain(grantToRevoke.doctor);
       } else {

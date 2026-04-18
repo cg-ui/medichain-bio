@@ -1,44 +1,47 @@
-import React from 'react';
-import { Shield, Database, Activity, Search, Filter, ExternalLink, CheckCircle2, Clock, RefreshCw, Lock, Globe, FileCheck } from 'lucide-react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Shield, Database, Activity, Search, Filter, ExternalLink, CheckCircle2, Clock, RefreshCw, Lock, Globe, FileCheck, Loader2, UserPlus, Unlock } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
-
-const ledgerEntries = [
-  {
-    status: 'Confirmed',
-    timestamp: 'Oct 24, 2023 • 14:32:01',
-    type: 'Data Entry',
-    entity: 'St. Mary\'s Cardiology Dept.',
-    hash: '0x8a2f...3f1d',
-    icon: Database
-  },
-  {
-    status: 'Confirmed',
-    timestamp: 'Oct 24, 2023 • 12:15:44',
-    type: 'Access Granted',
-    entity: 'Dr. Elizabeth Thorne',
-    hash: '0x4c9e...a92b',
-    icon: Lock
-  },
-  {
-    status: 'Pending',
-    timestamp: 'Oct 24, 2023 • 15:01:22',
-    type: 'Report Generated',
-    entity: 'Automated Analysis Core',
-    hash: '0x1d2a...ff82',
-    icon: FileCheck
-  },
-  {
-    status: 'Confirmed',
-    timestamp: 'Oct 23, 2023 • 09:12:00',
-    type: 'Storage Re-hash',
-    entity: 'System Integrity Bot',
-    hash: '0x9e11...cc04',
-    icon: RefreshCw
-  }
-];
+import { fetchAuditLog } from '../services/blockchainService';
 
 export function Blockchain() {
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadActivities = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      const logs = await fetchAuditLog();
+      
+      const mappedEntries = logs.map((log, index) => {
+        let icon = Database;
+        if (log.ipfsHash === "LOGIN_EVENT") icon = Shield;
+        else if (log.ipfsHash === "ACCESS_GRANT" || log.ipfsHash === "EMERGENCY_GRANT") icon = UserPlus;
+        else if (log.ipfsHash === "EMERGENCY_TOGGLE") icon = log.recordType.includes('ENABLED') ? Unlock : Lock;
+
+        return {
+          status: log.isPendingSync ? 'Pending' : 'Confirmed',
+          timestamp: log.formattedDate,
+          type: log.recordType,
+          entity: log.uploader.slice(0, 10) + '...',
+          hash: log.transactionHash.slice(0, 10) + '...',
+          icon,
+          isSimulated: log.isSimulated
+        };
+      });
+
+      setActivities(mappedEntries);
+    } catch (err) {
+      console.error("Failed to fetch blockchain logs:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadActivities();
+    window.addEventListener('blockchain-update', () => loadActivities(false));
+    return () => window.removeEventListener('blockchain-update', () => loadActivities(false));
+  }, [loadActivities]);
   return (
     <div className="p-8 max-w-[1600px] mx-auto w-full space-y-8">
       {/* Top Header */}
@@ -126,42 +129,62 @@ export function Blockchain() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/10">
-              {ledgerEntries.map((entry, idx) => (
-                <tr key={idx} className="group hover:bg-surface-container-low transition-colors">
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-2">
-                      <div className={cn("w-2 h-2 rounded-full", entry.status === 'Confirmed' ? "bg-teal-500" : "bg-outline-variant animate-pulse")} />
-                      <span className="text-xs font-bold text-on-surface">{entry.status}</span>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-8 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3 text-outline">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      <p className="text-sm font-bold">Fetching ledger from blockchain...</p>
                     </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="text-xs font-medium text-on-surface-variant">{entry.timestamp}</span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-2">
-                      <entry.icon className="w-4 h-4 text-primary" />
-                      <span className="text-xs font-bold text-on-surface">{entry.type}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="text-xs font-medium text-on-surface-variant">{entry.entity}</span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="text-[10px] font-mono text-outline bg-surface-container-low px-2 py-1 rounded">{entry.hash}</span>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    {entry.status === 'Confirmed' ? (
-                      <button className="text-[10px] font-bold text-primary flex items-center gap-1 ml-auto hover:underline">
-                        View on Blockchain <ExternalLink className="w-3 h-3" />
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-1 justify-end text-[10px] font-bold text-outline">
-                        Syncing... <RefreshCw className="w-3 h-3 animate-spin" />
-                      </div>
-                    )}
                   </td>
                 </tr>
-              ))}
+              ) : activities.length > 0 ? (
+                activities.map((entry, idx) => (
+                  <tr key={idx} className="group hover:bg-surface-container-low transition-colors">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", entry.status === 'Confirmed' ? "bg-teal-500" : "bg-outline-variant animate-pulse")} />
+                        <span className="text-xs font-bold text-on-surface">{entry.status}</span>
+                        {entry.isSimulated && (
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-tighter ml-1">Simulated</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className="text-xs font-medium text-on-surface-variant">{entry.timestamp}</span>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-2">
+                        <entry.icon className="w-4 h-4 text-primary" />
+                        <span className="text-xs font-bold text-on-surface">{entry.type}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className="text-xs font-medium text-on-surface-variant">{entry.entity}</span>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className="text-[10px] font-mono text-outline bg-surface-container-low px-2 py-1 rounded">{entry.hash}</span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      {entry.status === 'Confirmed' ? (
+                        <button className="text-[10px] font-bold text-primary flex items-center gap-1 ml-auto hover:underline">
+                          View on Blockchain <ExternalLink className="w-3 h-3" />
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1 justify-end text-[10px] font-bold text-outline">
+                          Syncing... <RefreshCw className="w-3 h-3 animate-spin" />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-8 py-12 text-center text-outline text-sm font-bold">
+                    No ledger entries found on the blockchain.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
