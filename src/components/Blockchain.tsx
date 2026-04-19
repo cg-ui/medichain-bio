@@ -2,9 +2,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Database, Activity, Search, Filter, ExternalLink, CheckCircle2, Clock, RefreshCw, Lock, Globe, FileCheck, Loader2, UserPlus, Unlock } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { fetchAuditLog } from '../services/blockchainService';
+import { AuditLogEntry } from '../types';
+
+interface BlockchainEntry {
+  status: string;
+  timestamp: string;
+  type: string;
+  entity: string;
+  hash: string;
+  icon: React.ElementType;
+  isSimulated?: boolean;
+}
 
 export function Blockchain() {
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<BlockchainEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadActivities = useCallback(async (showLoading = true) => {
@@ -39,8 +50,9 @@ export function Blockchain() {
 
   useEffect(() => {
     loadActivities();
-    window.addEventListener('blockchain-update', () => loadActivities(false));
-    return () => window.removeEventListener('blockchain-update', () => loadActivities(false));
+    const handleBlockchainUpdate = () => loadActivities(false);
+    window.addEventListener('blockchain-update', handleBlockchainUpdate);
+    return () => window.removeEventListener('blockchain-update', handleBlockchainUpdate);
   }, [loadActivities]);
   return (
     <div className="p-8 max-w-[1600px] mx-auto w-full space-y-8">

@@ -6,6 +6,7 @@ import { cn } from '@/src/lib/utils';
 import { fetchAuditLog, isContractDeployed } from '../services/blockchainService';
 import { resolveEmailToAddress } from '../services/userService';
 import { useVitals } from '../context/VitalsContext';
+import { AuditLogEntry } from '../types';
 
 const weeklyCoverage = [
   { day: 'MON', value: 245000, type: 'coverage' },
@@ -18,7 +19,7 @@ const weeklyCoverage = [
 ];
 
 export function Reports() {
-  const [blockchainLogs, setBlockchainLogs] = useState<any[]>([]);
+  const [blockchainLogs, setBlockchainLogs] = useState<AuditLogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);

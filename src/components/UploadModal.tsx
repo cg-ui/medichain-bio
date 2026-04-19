@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { X, Upload, FileText, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { uploadToIPFS, addRecordOnChain, simulateRecordOnChain, ensureSepoliaNetwork } from '../services/blockchainService';
+import { uploadToIPFS, addRecordOnChain, simulateRecordOnChain, ensureSepoliaNetwork, saveToCloudBackup } from '../services/blockchainService';
+
+import { UserProfile } from '../types';
 
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: any;
+  user: UserProfile | null;
 }
 
 export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
@@ -18,6 +20,8 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
   const [status, setStatus] = useState<'idle' | 'uploading' | 'recording' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
   const [txHash, setTxHash] = useState('');
+  const [useCloudBackup, setUseCloudBackup] = useState(true);
+  const [cloudProvider] = useState(import.meta.env.VITE_CLOUD_PROVIDER || 'MongoDB Atlas');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -35,12 +39,25 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
       setStatus('uploading');
       setError('');
 
-      // 1. Upload to IPFS
+      // 1. Upload to IPFS first
       const ipfsHash = await uploadToIPFS(file);
+
+      // 2. Optionally save a cloud backup of the upload metadata.
+      //    The server will generate a real privacy-preserving summary using Gemini AI.
+      if (useCloudBackup) {
+        await saveToCloudBackup({
+          patientAddress,
+          recordType,
+          fileName: file.name,
+          ipfsHash,
+          cloudProvider,
+          timestamp: Math.floor(Date.now() / 1000),
+        });
+      }
       
       setStatus('recording');
       
-      // 2. Record on Blockchain (Real or Simulated)
+      // 4. Record on Blockchain (Real or Simulated)
       let receipt;
       if (isSimulation) {
         receipt = await simulateRecordOnChain(patientAddress, ipfsHash, recordType);
@@ -75,12 +92,15 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
           recordType 
         } 
       }));
-    } catch (err: any) {
-      console.error(err);
-      let msg = err.message || "An error occurred during upload.";
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred during upload.";
+      let msg = errorMessage;
       if (msg.includes("insufficient funds")) {
         msg = "Insufficient Sepolia ETH. Please get free test ETH from a faucet (e.g., sepoliafaucet.com) or use 'Simulation Mode'.";
-      } else if (msg.includes("user rejected") || err.code === "ACTION_REJECTED" || err.code === 4001) {
+      } else if (
+        msg.includes("user rejected") ||
+        (typeof err === 'object' && err !== null && 'code' in err && ((err as any).code === "ACTION_REJECTED" || (err as any).code === 4001))
+      ) {
         msg = "Transaction was canceled. You can use 'Simulation Mode' to test without signing.";
       }
       setError(msg);
@@ -192,28 +212,49 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
                   </label>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                      <ShieldAlert className="w-4 h-4" />
+                <div className="grid gap-4">
+                  <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                        <ShieldAlert className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-on-surface">Simulation Mode</p>
+                        <p className="text-[10px] text-outline">Free demo on Sanctuary Network</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-on-surface">Simulation Mode</p>
-                      <p className="text-[10px] text-outline">Free demo on Sanctuary Network</p>
-                    </div>
+                    <button 
+                      onClick={() => setIsSimulation(!isSimulation)}
+                      className={cn(
+                        "w-12 h-6 rounded-full transition-all relative",
+                        isSimulation ? "bg-primary" : "bg-outline-variant"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                        isSimulation ? "right-1" : "left-1"
+                      )} />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setIsSimulation(!isSimulation)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-all relative",
-                      isSimulation ? "bg-primary" : "bg-outline-variant"
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                      isSimulation ? "right-1" : "left-1"
-                    )} />
-                  </button>
+
+                  <div className="flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant/20">
+                    <div>
+                      <p className="text-xs font-bold text-on-surface uppercase mb-1">Cloud Backup</p>
+                      <p className="text-[10px] text-outline">Store GAN-anonymized metadata in secure cloud backup.</p>
+                    </div>
+                    <button 
+                      onClick={() => setUseCloudBackup(!useCloudBackup)}
+                      className={cn(
+                        "w-12 h-6 rounded-full transition-all relative",
+                        useCloudBackup ? "bg-teal-500" : "bg-outline-variant"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                        useCloudBackup ? "right-1" : "left-1"
+                      )} />
+                    </button>
+                  </div>
                 </div>
 
                 {error && (
@@ -231,7 +272,7 @@ export function UploadModal({ isOpen, onClose, user }: UploadModalProps) {
                   {status === 'uploading' ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Uploading to IPFS...
+                      Uploading to IPFS + Cloud...
                     </>
                   ) : status === 'recording' ? (
                     <>

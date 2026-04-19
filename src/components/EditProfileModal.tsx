@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
 import { X, User, Save, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { UserProfile } from '../types';
 
 interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: any;
-  onSave: (updatedUser: any) => void;
+  user?: UserProfile & { age?: string; bloodGroup?: string; dob?: string };
+  onSave: (updatedUser: UserProfile & { age: string; bloodGroup: string; dob: string }) => void;
+}
+
+interface ProfileFormData {
+  name: string;
+  age: string;
+  bloodGroup: string;
+  dob: string;
 }
 
 export function EditProfileModal({ isOpen, onClose, user, onSave }: EditProfileModalProps) {

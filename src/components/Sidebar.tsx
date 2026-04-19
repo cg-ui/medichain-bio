@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { motion } from 'motion/react';
+import { UserProfile } from '../types';
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -31,7 +32,7 @@ interface SidebarProps {
   onTabChange: (id: string) => void;
   onLogout?: () => void;
   onUploadClick?: () => void;
-  user?: any;
+  user?: UserProfile;
 }
 
 export function Sidebar({ activeTab, onTabChange, onLogout, onUploadClick, user }: SidebarProps) {
