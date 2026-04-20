@@ -51,14 +51,15 @@ export function useMetaMask() {
       });
 
       return address;
-    } catch (err: any) {
-      console.error("MetaMask connection error:", err);
+    } catch (err: unknown) {
       let errorMessage = "An error occurred while connecting to MetaMask.";
-      
-      if (err.code === 4001) {
-        errorMessage = "Connection request rejected by user.";
-      } else if (err.code === -32002) {
-        errorMessage = "Request already pending. Please check MetaMask.";
+      if (typeof err === 'object' && err !== null && 'code' in err) {
+        const typedError = err as { code?: number };
+        if (typedError.code === 4001) {
+          errorMessage = "Connection request rejected by user.";
+        } else if (typedError.code === -32002) {
+          errorMessage = "Request already pending. Please check MetaMask.";
+        }
       }
 
       setState(prev => ({ 

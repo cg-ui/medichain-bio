@@ -2,9 +2,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, Key, Loader2, Database, RefreshCw, Copy, Check, ShieldCheck, UserPlus, Unlock, Lock } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { fetchAuditLog } from '../services/blockchainService';
+import { AuditLogEntry } from '../types';
+
+interface ActivityItem {
+  id: number;
+  icon: React.ElementType;
+  title: string;
+  time: string;
+  description: string;
+  ipfsHash: string | null;
+  tag: string;
+  color: string;
+  tagColor?: string;
+  isSimulated?: boolean;
+}
 
 export function ActivityFeed() {
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -74,6 +88,7 @@ export function ActivityFeed() {
           title: 'Access Granted: Dr. Aris Thorne',
           time: '45m ago',
           description: 'Radiology Dept. accessed 2023_MRI_Spine.dcm via temporary clinical bridge.',
+          ipfsHash: null,
           tag: 'TEMPORARY TOKEN',
           tagColor: 'bg-secondary-container text-on-secondary-container',
           color: 'text-secondary bg-secondary/5 hover:bg-secondary'

@@ -3,13 +3,16 @@ import { X, Activity, Stethoscope, Syringe, ClipboardList, Upload, FileText, Che
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { uploadToIPFS, simulateRecordOnChain, addRecordOnChain, ensureSepoliaNetwork } from '../services/blockchainService';
+import { UserProfile } from '../types';
 
 interface MedicalUpdateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: any;
-  onUpdate: (newEntry: any) => void;
+  user?: UserProfile;
+  onUpdate: (newEntry: { date: string; ref: string; title: string; description: string; hash: string; ipfsHash: string; color: string; dot: string; isSimulated: boolean }) => void;
 }
+
+type MedicalUpdateType = 'diagnosis' | 'vaccination' | 'general checkup';
 
 export function MedicalUpdateModal({ isOpen, onClose, user, onUpdate }: MedicalUpdateModalProps) {
   const [type, setType] = useState<'diagnosis' | 'vaccination' | 'general checkup'>('diagnosis');
@@ -75,13 +78,16 @@ export function MedicalUpdateModal({ isOpen, onClose, user, onUpdate }: MedicalU
           recordType: type 
         } 
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      let msg = err.message || "An error occurred.";
-      if (msg.includes("insufficient funds")) {
+      let msg = 'An error occurred.';
+      if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as any).message === 'string') {
+        msg = (err as any).message;
+      }
+      if (msg.includes('insufficient funds')) {
         msg = "Insufficient Sepolia ETH. Use 'Simulation Mode'.";
-      } else if (msg.includes("user rejected") || err.code === 4001) {
-        msg = "Transaction canceled.";
+      } else if (msg.includes('user rejected') || (typeof err === 'object' && err !== null && (err as any).code === 4001)) {
+        msg = 'Transaction canceled.';
       }
       setError(msg);
       setStatus('error');
@@ -131,13 +137,13 @@ export function MedicalUpdateModal({ isOpen, onClose, user, onUpdate }: MedicalU
                   <label className="block text-xs font-bold text-outline uppercase mb-2 ml-1">Update Type</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope },
-                      { id: 'vaccination', label: 'Vaccination', icon: Syringe },
-                      { id: 'general checkup', label: 'Checkup', icon: ClipboardList },
+                      { id: 'diagnosis' as MedicalUpdateType, label: 'Diagnosis', icon: Stethoscope },
+                      { id: 'vaccination' as MedicalUpdateType, label: 'Vaccination', icon: Syringe },
+                      { id: 'general checkup' as MedicalUpdateType, label: 'Checkup', icon: ClipboardList },
                     ].map((item) => (
                       <button
                         key={item.id}
-                        onClick={() => setType(item.id as any)}
+                        onClick={() => setType(item.id)}
                         className={cn(
                           "flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all",
                           type === item.id 

@@ -3,9 +3,10 @@ import { Search, Bell, Moon, Sun, Share2, LogOut, Wallet, RefreshCw } from 'luci
 import { motion } from 'motion/react';
 import { useMetaMask } from '../hooks/useMetaMask';
 import { cn } from '@/src/lib/utils';
+import { UserProfile } from '../types';
 
 interface TopBarProps {
-  user?: any;
+  user?: UserProfile;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
   onLogout?: () => void;

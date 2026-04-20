@@ -40,17 +40,11 @@ export async function resolveEmailToAddress(email: string): Promise<string | nul
     
     // Check for null or zero address
     if (!address || address === '0x0000000000000000000000000000000000000000') {
-      // For demo purposes, if the user exists but has no wallet, 
-      // generate a deterministic mock address so the simulation can proceed
-      console.log("Patient found but no wallet linked. Generating demo address for simulation.");
-      // Simple deterministic address from email
-      const hash = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      address = `0x${hash.toString(16).padStart(40, '0')}`.slice(0, 42);
+      return null;
     }
     
     return address;
-  } catch (err) {
-    console.error("Failed to resolve email via API, falling back to mock:", err);
+  } catch (_err) {
     const mock = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
     return mock ? mock.address : null;
   }

@@ -22,6 +22,7 @@ import { UploadModal } from './components/UploadModal';
 import { MedicalUpdateModal } from './components/MedicalUpdateModal';
 import { VitalsProvider, useVitals } from './context/VitalsContext';
 import { AuthProvider } from './context/AuthContext';
+import { UserProfile } from './types';
 import { Plus, LogOut, Stethoscope, Syringe, ClipboardList, Upload as UploadIcon, BrainCircuit, AlertTriangle, Info as InfoIcon, Shield, DollarSign, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useEffect } from 'react';
@@ -30,7 +31,7 @@ import { Toaster, toast } from 'sonner';
 import { useMetaMask } from './hooks/useMetaMask';
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
 
   return (
     <AuthProvider initialUser={user}>
@@ -42,7 +43,7 @@ export default function App() {
   );
 }
 
-function AppContent({ user, setUser }: { user: any, setUser: (u: any) => void }) {
+function AppContent({ user, setUser }: { user: UserProfile | null, setUser: (u: UserProfile | null) => void }) {
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('tab') || 'dashboard';

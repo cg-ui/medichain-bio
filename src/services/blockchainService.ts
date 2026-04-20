@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import MediChainArtifact from '../artifacts/contracts/MediChainRecords.sol/MediChainRecords.json';
+import { AuditLogEntry } from '../types';
 
 declare global {
   interface Window {
@@ -68,7 +69,7 @@ export async function ensureSepoliaNetwork() {
 }
 
 // In-memory storage for simulated logs (persists during session)
-const simulatedLogs: any[] = [];
+const simulatedLogs: AuditLogEntry[] = [];
 
 /**
  * Simulates a blockchain transaction for demo purposes
@@ -162,52 +163,30 @@ export async function simulateLogLogin(userAddress: string) {
  * @returns The IPFS CID (Hash)
  */
 export async function uploadToIPFS(file: File): Promise<string> {
-  console.log("Uploading file to IPFS via Pinata:", file.name);
-  
-  const jwt = import.meta.env.VITE_PINATA_JWT;
-  
-  if (!jwt) {
-    console.warn("Pinata JWT not found in environment. Falling back to simulation CID.");
-    // Fallback to a real sample CID if no API key is provided yet
-    return "QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K";
-  }
+  const formData = new FormData();
+  formData.append('file', file);
 
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const metadata = JSON.stringify({
-      name: file.name,
-      keyvalues: {
-        app: 'MediChain',
-        uploadedAt: new Date().toISOString()
-      }
-    });
-    formData.append('pinataMetadata', metadata);
-
-    const options = JSON.stringify({
-      cidVersion: 1,
-    });
-    formData.append('pinataOptions', options);
-
-    const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+    const res = await fetch('/api/ipfs/upload', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${jwt}`
-      },
-      body: formData
+      body: formData,
     });
 
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(`Pinata upload failed: ${errorData.error?.details || res.statusText}`);
+      const errorData = await res.json().catch(() => null);
+      const fallbackSampleCid = "QmPZ9gcCEpqKTo6aq61g2nd7KxcyvecyvMT99cOc7yEn1K";
+
+      if (res.status === 500 && errorData?.error?.includes('Pinata JWT is not configured')) {
+        console.warn('Server-side IPFS proxy is not configured; falling back to sample CID.');
+        return fallbackSampleCid;
+      }
+
+      throw new Error(`IPFS upload failed: ${errorData?.error || res.statusText}`);
     }
 
     const data = await res.json();
-    console.log("File pinned successfully:", data.IpfsHash);
-    return data.IpfsHash;
+    return data.ipfsHash;
   } catch (error) {
-    console.error("Error uploading to Pinata:", error);
     throw error;
   }
 }
@@ -228,6 +207,35 @@ export function getIPFSLink(cid: string) {
   // Ensure no trailing slash in gateway URL
   const base = gateway.endsWith('/') ? gateway.slice(0, -1) : gateway;
   return `${base}/ipfs/${effectiveCid}`;
+}
+
+export interface PrivacyBackupRecord {
+  patientAddress: string;
+  recordType: string;
+  fileName: string;
+  ipfsHash: string;
+  cloudProvider: string;
+  timestamp: number;
+}
+
+export async function saveToCloudBackup(record: PrivacyBackupRecord) {
+  try {
+    const res = await fetch('/api/cloud/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Cloud backup failed');
+    }
+
+    return await res.json();
+  } catch (error) {
+    console.error('Error saving to cloud backup:', error);
+    throw error;
+  }
 }
 
 /**
@@ -251,13 +259,9 @@ export async function addRecordOnChain(
       signer
     );
 
-    console.log(`Recording ${recordType} on-chain for patient ${patientAddress}...`);
-    
     const tx = await contract.addMedicalRecord(patientAddress, ipfsHash, recordType);
     const receipt = await tx.wait();
-    
     const hash = receipt.hash || receipt.transactionHash;
-    console.log("Transaction confirmed:", hash);
     return { ...receipt, hash, ipfsHash };
   } catch (err) {
     console.error("Failed to add record on-chain:", err);
@@ -312,13 +316,11 @@ export async function fetchAuditLog(patientAddress?: string) {
     );
 
     // Timeout helper
-    const withTimeout = (promise: Promise<any>, ms: number) => 
+    const withTimeout = <T>(promise: Promise<T>, ms: number) => 
       Promise.race([
         promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
       ]);
-
-    console.log(`Fetching blockchain logs for ${filterAddress || 'all patients'}...`);
 
     // Define all filters
     const filters = [
@@ -337,10 +339,10 @@ export async function fetchAuditLog(patientAddress?: string) {
       10000
     );
 
-    const [recordEvents, grantEvents, revokeEvents, unlockEvents, eGrantEvents, loginEvents] = eventResults;
+    const [recordEvents, grantEvents, revokeEvents, unlockEvents, eGrantEvents, loginEvents] = eventResults as any[][];
 
-    const chainLogs = recordEvents.map(event => {
-      const { patientAddress, ipfsHash, recordType, timestamp, uploader } = (event as any).args;
+    const chainLogs = recordEvents.map((event: any) => {
+      const { patientAddress, ipfsHash, recordType, timestamp, uploader } = event.args as any;
       return {
         patientAddress,
         ipfsHash,
@@ -352,8 +354,8 @@ export async function fetchAuditLog(patientAddress?: string) {
       };
     });
 
-    const grantLogs = grantEvents.map(event => {
-      const { patient, doctor, modules, expiry } = (event as any).args;
+    const grantLogs = grantEvents.map((event: any) => {
+      const { patient, doctor, modules, expiry } = event.args as any;
       return {
         patientAddress: patient,
         ipfsHash: "ACCESS_GRANT",
@@ -365,8 +367,8 @@ export async function fetchAuditLog(patientAddress?: string) {
       };
     });
 
-    const revokeLogs = revokeEvents.map(event => {
-      const { patient, doctor } = (event as any).args;
+    const revokeLogs = revokeEvents.map((event: any) => {
+      const { patient, doctor } = event.args as any;
       return {
         patientAddress: patient,
         ipfsHash: "ACCESS_REVOKE",
@@ -378,8 +380,8 @@ export async function fetchAuditLog(patientAddress?: string) {
       };
     });
 
-    const unlockLogs = unlockEvents.map(event => {
-      const { patient, status } = (event as any).args;
+    const unlockLogs = unlockEvents.map((event: any) => {
+      const { patient, status } = event.args as any;
       return {
         patientAddress: patient,
         ipfsHash: "EMERGENCY_TOGGLE",
@@ -391,8 +393,8 @@ export async function fetchAuditLog(patientAddress?: string) {
       };
     });
 
-    const eGrantLogs = eGrantEvents.map(event => {
-      const { patient, doctor, reason, expiry } = (event as any).args;
+    const eGrantLogs = eGrantEvents.map((event: any) => {
+      const { patient, doctor, reason, expiry } = event.args as any;
       return {
         patientAddress: patient,
         ipfsHash: "EMERGENCY_GRANT",
@@ -404,8 +406,8 @@ export async function fetchAuditLog(patientAddress?: string) {
       };
     });
 
-    const loginLogs = loginEvents.map(event => {
-      const { user, timestamp } = (event as any).args;
+    const loginLogs = loginEvents.map((event: any) => {
+      const { user, timestamp } = event.args as any;
       return {
         patientAddress: user,
         ipfsHash: "LOGIN_EVENT",

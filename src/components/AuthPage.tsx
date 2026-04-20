@@ -5,8 +5,10 @@ import { cn } from '@/src/lib/utils';
 import { useMetaMask } from '../hooks/useMetaMask';
 import { toast } from 'sonner';
 
+import { UserProfile } from '../types';
+
 interface AuthPageProps {
-  onLogin: (user: any) => void;
+  onLogin: (user: UserProfile) => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
 }
@@ -64,8 +66,9 @@ export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProp
       } else {
         setStep('connect');
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Authentication failed';
+      setError(message);
     } finally {
       setIsLoggingIn(false);
     }
@@ -111,14 +114,16 @@ export function AuthPage({ onLogin, isDarkMode, onToggleDarkMode }: AuthPageProp
         isDemo: data.isDemo ?? true
       };
 
-      console.log("Finalizing login with user:", userToLogin);
       onLogin(userToLogin);
-    } catch (err: any) {
-      console.error("Finalization error:", err);
-      setError(err.message || "Failed to finalize secure login");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to finalize secure login";
+      setError(message);
       // If it's a user rejection, don't force them out, but show error
-      if (err.code === 4001) {
-        toast.error("Verification rejected. Secure features may be limited.");
+      if (typeof err === 'object' && err !== null && 'code' in err) {
+        const typedErr = err as { code?: number };
+        if (typedErr.code === 4001) {
+          toast.error("Verification rejected. Secure features may be limited.");
+        }
       }
     } finally {
       setIsFinalizing(false);

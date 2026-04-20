@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface User {
   email: string;
-  walletAddress: string | null;
+  walletAddress?: string | null;
   role: 'patient' | 'doctor';
   name: string;
 }

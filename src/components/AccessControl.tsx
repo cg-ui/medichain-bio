@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Stethoscope, UserCog, User, Activity, Beaker, FileText, Clock, CheckCircle2, AlertCircle, History, Lock, ShieldCheck, Mail, Loader2, X, Wallet, Database } from 'lucide-react';
+import { AuditLogEntry, UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { fetchAccessGrants, grantAccessOnChain, revokeAccessOnChain, simulateGrantAccess, simulateRevokeAccess, fetchAuditLog } from '../services/blockchainService';
 import { resolveEmailToAddress } from '../services/userService';
 import { useMetaMask } from '../hooks/useMetaMask';
+
+type AccessGrant = {
+  doctor: string;
+  modules: string[];
+  expiry: number;
+  [key: string]: unknown;
+};
 
 const DURATION_MAP: Record<string, number> = {
   '24h': 86400,
@@ -25,13 +33,13 @@ export function AccessControl() {
   const [email, setEmail] = useState('');
   const [selectedModules, setSelectedModules] = useState<string[]>(['vitals', 'lab']);
   const [duration, setDuration] = useState('7 Days');
-  const [activeGrants, setActiveGrants] = useState<any[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [activeGrants, setActiveGrants] = useState<AccessGrant[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGranting, setIsGranting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showRevokeModal, setShowRevokeModal] = useState(false);
-  const [grantToRevoke, setGrantToRevoke] = useState<any>(null);
+  const [grantToRevoke, setGrantToRevoke] = useState<AccessGrant | null>(null);
   const [grantMethod, setGrantMethod] = useState<'simulation' | 'metamask' | null>(null);
   const [revokeMethod, setRevokeMethod] = useState<'simulation' | 'metamask' | null>(null);
   const [isRevoking, setIsRevoking] = useState(false);
@@ -44,7 +52,7 @@ export function AccessControl() {
         fetchAuditLog(walletAddress || undefined)
       ]);
       setActiveGrants(grants);
-      setAuditLogs(logs.filter((l: any) => l.ipfsHash === 'ACCESS_GRANT' || l.ipfsHash === 'ACCESS_REVOKE').slice(0, 5));
+      setAuditLogs(logs.filter((log) => log.ipfsHash === 'ACCESS_GRANT' || log.ipfsHash === 'ACCESS_REVOKE').slice(0, 5));
     } catch (err) {
       console.error("Failed to load access data:", err);
     } finally {
@@ -107,7 +115,7 @@ export function AccessControl() {
     }
   };
 
-  const handleRevokeClick = (grant: any) => {
+  const handleRevokeClick = (grant: AccessGrant) => {
     setGrantToRevoke(grant);
     setShowRevokeModal(true);
   };

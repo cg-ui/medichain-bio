@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Watch, Smartphone, RefreshCw, Plus, Lock, Info, Clock, CheckCircle2, Activity, Edit3, Copy, Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { UserProfile } from '../types';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { EditProfileModal } from './EditProfileModal';
@@ -43,8 +44,11 @@ const initialTimeline = [
 
 export function PatientProfile() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<UserProfile & { age: string; bloodGroup: string; dob: string }>({
+    email: 'sarah.mitchell@example.com',
+    role: 'patient',
     name: 'Sarah Mitchell',
+    walletAddress: null,
     age: '32 Years',
     bloodGroup: 'A Positive',
     dob: 'May 14, 1991'
