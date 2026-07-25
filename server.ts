@@ -132,12 +132,12 @@ app.post("/api/auth/signup", async (req, res) => {
     
     res.status(201).json({ message: "User created" });
   } catch (error) {
-  console.error("🔥 SIGNUP ERROR:", error);
-  res.status(400).json({
-    error: "Signup failed",
-    details: error instanceof Error ? error.message : error
-  });
-}
+    console.error("🔥 SIGNUP ERROR:", error);
+    res.status(400).json({
+      error: "Signup failed",
+      details: error instanceof Error ? error.message : error
+    });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -174,7 +174,15 @@ app.post("/api/auth/login", async (req, res) => {
       sameSite: COOKIE_SAME_SITE,
       maxAge: 24 * 60 * 60 * 1000,
     });
-    res.json({ user: { email: user.email, role: user.role }, isDemo: !isDbConnected });
+    res.json({
+      user: {
+        email: user.email,
+        role: user.role,
+        name: user.name || user.email.split('@')[0],
+        walletAddress: user.walletAddress || null,
+      },
+      isDemo: !isDbConnected,
+    });
   } catch (error) {
     res.status(500).json({ error: "Login failed" });
   }

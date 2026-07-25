@@ -86,6 +86,19 @@ function AppContent({ user, setUser }: { user: UserProfile | null, setUser: (u: 
     }
   }, [isDarkMode]);
 
+  const effectiveTab = (() => {
+    if (activeTab === 'patient-profile' && user?.role === 'doctor') return 'dashboard';
+    if (activeTab === 'doctor-profile' && user?.role === 'patient') return 'dashboard';
+    if (activeTab === 'patients' && user?.role === 'patient') return 'dashboard';
+    return activeTab;
+  })();
+
+  useEffect(() => {
+    if (effectiveTab !== activeTab) {
+      setActiveTab(effectiveTab);
+    }
+  }, [effectiveTab, activeTab]);
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -138,21 +151,7 @@ function AppContent({ user, setUser }: { user: UserProfile | null, setUser: (u: 
   }
 
   const renderContent = () => {
-    // Role-based access control
-    if (activeTab === 'patient-profile' && user?.role === 'doctor') {
-      setActiveTab('dashboard');
-      return null;
-    }
-    if (activeTab === 'doctor-profile' && user?.role === 'patient') {
-      setActiveTab('dashboard');
-      return null;
-    }
-    if (activeTab === 'patients' && user?.role === 'patient') {
-      setActiveTab('dashboard');
-      return null;
-    }
-
-    switch (activeTab) {
+    switch (effectiveTab) {
       case 'dashboard':
         return (
           <div className="p-8 max-w-[1600px] mx-auto w-full">

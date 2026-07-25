@@ -1,9 +1,9 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "/app/applet/contracts/MediChainRecords.sol": {
-      "lastModificationDate": 1775581543549,
-      "contentHash": "9ba7dc4067b6cbe2392aad9673b4aa42",
+    "C:\\medichain-bio\\contracts\\MediChainRecords.sol": {
+      "lastModificationDate": 1777793099127,
+      "contentHash": "7f9660ef3c384f5171f7eeb7ad82d038",
       "sourceName": "contracts/MediChainRecords.sol",
       "solcConfig": {
         "version": "0.8.20",
